@@ -14,7 +14,7 @@ import { getPersistentVisitorId, type VisitorIdLoader } from "./client";
 
 type DeviceIdentityStatus = "loading" | "ready" | "error";
 
-type DeviceIdentity = {
+export type DeviceIdentity = {
   visitorId: string | null;
   status: DeviceIdentityStatus;
   retry: () => void;

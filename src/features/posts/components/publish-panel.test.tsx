@@ -1,0 +1,115 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { GIVE_COMMAND } from "../../../../tests/fixtures/cmcc-samples";
+import { PublishPanel } from "./publish-panel";
+import type { DeviceIdentity } from "@/features/posts/device/device-provider";
+
+const push = vi.fn();
+const identity: DeviceIdentity = {
+  status: "ready",
+  visitorId: "visitor-id-123",
+  retry: vi.fn(),
+};
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push }),
+}));
+
+vi.mock("@/features/posts/device/device-provider", () => ({
+  useDeviceIdentity: () => identity,
+}));
+
+function renderPanel(overrides: Partial<React.ComponentProps<typeof PublishPanel>> = {}) {
+  return render(
+    <PublishPanel
+      discount={80}
+      pieceNumber={6}
+      {...overrides}
+    />,
+  );
+}
+
+describe("PublishPanel", () => {
+  afterEach(() => {
+    cleanup();
+    push.mockReset();
+    vi.unstubAllGlobals();
+    identity.status = "ready";
+    identity.visitorId = "visitor-id-123";
+  });
+
+  it("无拼图选择时禁用口令输入和图片按钮", () => {
+    renderPanel({ pieceNumber: null });
+
+    expect(screen.getByLabelText("拼图口令")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "选择二维码图片" })).toBeDisabled();
+  });
+
+  it("粘贴真实赠送口令后显示预览", async () => {
+    renderPanel();
+    fireEvent.change(screen.getByLabelText("拼图口令"), {
+      target: { value: GIVE_COMMAND },
+    });
+
+    expect(await screen.findByText("8折6号·赠送")).toBeInTheDocument();
+  });
+
+  it("当前选择不一致时显示错误且不请求 API", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    renderPanel({ pieceNumber: 1 });
+
+    fireEvent.change(screen.getByLabelText("拼图口令"), {
+      target: { value: GIVE_COMMAND },
+    });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("口令拼图与当前选择不一致");
+    fireEvent.click(screen.getByRole("button", { name: "发布" }));
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("发布失败保留输入并显示中文错误", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ error: { code: "DUPLICATE_POST" } }), {
+          status: 409,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    renderPanel();
+    const input = screen.getByLabelText("拼图口令");
+    fireEvent.change(input, { target: { value: GIVE_COMMAND } });
+    fireEvent.click(screen.getByRole("button", { name: "发布" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("这条内容已经发布过了");
+    expect(input).toHaveValue(GIVE_COMMAND);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("发布成功后清空输入并导航大厅", async () => {
+    const fetchSpy = vi.fn(async () => new Response("{}", { status: 201 }));
+    vi.stubGlobal("fetch", fetchSpy);
+    renderPanel();
+    const input = screen.getByLabelText("拼图口令");
+    fireEvent.change(input, { target: { value: GIVE_COMMAND } });
+    fireEvent.click(screen.getByRole("button", { name: "发布" }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/"));
+    expect(input).toHaveValue("");
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/posts",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("身份加载中禁用发布并显示加载提示", () => {
+    identity.status = "loading";
+    identity.visitorId = null;
+    renderPanel();
+
+    expect(screen.getByRole("button", { name: "正在准备身份…" })).toBeDisabled();
+  });
+});
