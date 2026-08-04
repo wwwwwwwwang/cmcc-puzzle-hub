@@ -25,7 +25,7 @@ export async function POST(
     switch (result.status) {
       case "CLAIMED":
         return Response.json(
-          { payloadKind: result.payloadKind, payload: result.payload },
+          { payloads: result.payloads, idempotent: result.idempotent },
           { headers: { "Cache-Control": "no-store" } },
         );
       case "SELF_CLAIM_FORBIDDEN":

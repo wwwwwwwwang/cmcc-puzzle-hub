@@ -36,7 +36,7 @@ function request(body: unknown) {
 
 const baseInput = {
   selection: { discount: 80, pieceNumber: 6 },
-  source: { kind: "COMMAND" as const, value: GIVE_COMMAND },
+  sources: { command: GIVE_COMMAND },
   visitorId: "visitor-id-123",
 };
 
@@ -51,10 +51,10 @@ describe("/api/posts", () => {
         type: "GIVE",
         discount: 80,
         pieceNumber: 6,
-        payloadKind: "COMMAND",
-        payload: "￥19uSvG￥",
+        availablePayloadKinds: ["COMMAND"],
+        payloads: { command: "￥19uSvG￥" },
         publisherDeviceHash: "device-hash",
-        payloadHash: "payload-hash",
+        payloadHashes: { command: "payload-hash" },
         createdAt: "2027-01-15T08:00:00.000Z",
         expiresAt: "2027-01-16T08:00:00.000Z",
       },
@@ -81,42 +81,38 @@ describe("/api/posts", () => {
     {
       name: "赠送口令",
       selection: { discount: 80, pieceNumber: 6 },
-      source: { kind: "COMMAND" as const, value: GIVE_COMMAND },
+      sources: { command: GIVE_COMMAND },
       type: "GIVE",
-      payloadKind: "COMMAND",
-      payload: "￥19uSvG￥",
+      payloads: { command: "￥19uSvG￥" },
     },
     {
       name: "求助口令",
       selection: { discount: 80, pieceNumber: 1 },
-      source: { kind: "COMMAND" as const, value: REQUEST_COMMAND },
+      sources: { command: REQUEST_COMMAND },
       type: "REQUEST",
-      payloadKind: "COMMAND",
-      payload: "￥19uSvR￥",
+      payloads: { command: "￥19uSvR￥" },
     },
     {
       name: "赠送 URL",
       selection: { discount: 80, pieceNumber: 6 },
-      source: { kind: "URL" as const, value: GIVE_URL },
+      sources: { url: GIVE_URL },
       type: "GIVE",
-      payloadKind: "URL",
-      payload: GIVE_URL,
+      payloads: { url: GIVE_URL },
     },
     {
       name: "求助 URL",
       selection: { discount: 80, pieceNumber: 1 },
-      source: { kind: "URL" as const, value: REQUEST_URL },
+      sources: { url: REQUEST_URL },
       type: "REQUEST",
-      payloadKind: "URL",
-      payload: REQUEST_URL,
+      payloads: { url: REQUEST_URL },
     },
-  ])("发布真实样本 $name", async ({ selection, source, type, payloadKind, payload }) => {
-    const response = await POST(request({ ...baseInput, selection, source }));
+  ])("发布真实样本 $name", async ({ selection, sources, type, payloads }) => {
+    const response = await POST(request({ ...baseInput, selection, sources }));
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toHaveProperty("post");
     const published = publishPost.mock.calls[0][0];
-    expect(published).toMatchObject({ type, payloadKind, payload });
-    expect(published.payloadHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(published).toMatchObject({ type, payloads });
+    expect(Object.values(published.payloadHashes)[0]).toMatch(/^[0-9a-f]{64}$/);
     expect(published.publisherDeviceHash).toBe("device-hash");
   });
 
@@ -137,9 +133,8 @@ describe("/api/posts", () => {
     const response = await POST(
       request({
         ...baseInput,
-        source: {
-          kind: "URL",
-          value: GIVE_URL.replace("h.app.coc.10086.cn", "evil.example.com"),
+        sources: {
+          url: GIVE_URL.replace("h.app.coc.10086.cn", "evil.example.com"),
         },
       }),
     );
@@ -199,7 +194,7 @@ describe("/api/posts", () => {
           type: "GIVE",
           discount: 80,
           pieceNumber: 9,
-          payloadKind: "COMMAND",
+          availablePayloadKinds: ["COMMAND"],
           createdAt: "2027-01-15T08:00:00.000Z",
           expiresAt: "2027-01-16T08:00:00.000Z",
         },

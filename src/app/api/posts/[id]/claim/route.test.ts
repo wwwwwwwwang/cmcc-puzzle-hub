@@ -22,8 +22,7 @@ describe("/api/posts/[id]/claim", () => {
     vi.clearAllMocks();
     claimPost.mockResolvedValue({
       status: "CLAIMED",
-      payloadKind: "COMMAND",
-      payload: "￥19uSvG￥",
+      payloads: { command: "￥19uSvG￥" },
       idempotent: false,
     });
   });
@@ -36,16 +35,15 @@ describe("/api/posts/[id]/claim", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     await expect(response.json()).resolves.toEqual({
-      payloadKind: "COMMAND",
-      payload: "￥19uSvG￥",
+      payloads: { command: "￥19uSvG￥" },
+      idempotent: false,
     });
   });
 
   it("URL 载荷和 idempotent=true 仍返回 200", async () => {
     claimPost.mockResolvedValue({
       status: "CLAIMED",
-      payloadKind: "URL",
-      payload: "https://example.com/secret",
+      payloads: { url: "https://example.com/secret" },
       idempotent: true,
     });
     const response = await POST(
@@ -54,8 +52,8 @@ describe("/api/posts/[id]/claim", () => {
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      payloadKind: "URL",
-      payload: "https://example.com/secret",
+      payloads: { url: "https://example.com/secret" },
+      idempotent: true,
     });
   });
 

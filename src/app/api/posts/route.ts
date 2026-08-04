@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { hashVisitorId } from "@/features/posts/device/hash";
 import { DomainError } from "@/features/posts/domain/errors";
-import { parseSource } from "@/features/posts/domain/parse-source";
+import { parseSources } from "@/features/posts/domain/parse-source";
 import {
   createPostInputSchema,
   type CreatePostInput,
@@ -49,19 +49,36 @@ export async function POST(request: Request) {
       });
     }
 
-    const parsedSource = parseSource(input.source, input.selection);
-    const payload = parsedSource.payload.trim();
-    const payloadHash = createHash("sha256").update(payload).digest("hex");
+    const parsedSources = parseSources(input.sources, input.selection);
+    const payloadHashes = {
+      ...(parsedSources.sources.command
+        ? {
+            command: createHash("sha256")
+              .update(parsedSources.sources.command)
+              .digest("hex"),
+          }
+        : {}),
+      ...(parsedSources.sources.url
+        ? {
+            url: createHash("sha256")
+              .update(parsedSources.sources.url)
+              .digest("hex"),
+          }
+        : {}),
+    };
     const createdAt = new Date();
     const expiresAt = new Date(createdAt.getTime() + POST_TTL_MS);
     const result = await publishPost({
-      type: parsedSource.type,
+      type: parsedSources.type,
       discount: input.selection.discount,
       pieceNumber: input.selection.pieceNumber,
-      payloadKind: parsedSource.payloadKind,
-      payload,
+      availablePayloadKinds: [
+        ...(parsedSources.sources.command ? (["COMMAND"] as const) : []),
+        ...(parsedSources.sources.url ? (["URL"] as const) : []),
+      ],
+      payloads: parsedSources.sources,
       publisherDeviceHash: deviceHash,
-      payloadHash,
+      payloadHashes,
       createdAt: createdAt.toISOString(),
       expiresAt: expiresAt.toISOString(),
     });
@@ -152,7 +169,7 @@ function toHallPostDto(post: StoredPost): HallPostDto {
     type: post.type,
     discount: post.discount,
     pieceNumber: post.pieceNumber,
-    payloadKind: post.payloadKind,
+    availablePayloadKinds: post.availablePayloadKinds,
     createdAt: post.createdAt,
     expiresAt: post.expiresAt,
   };
