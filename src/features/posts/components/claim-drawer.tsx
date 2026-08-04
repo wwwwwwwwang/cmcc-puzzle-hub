@@ -178,6 +178,13 @@ async function readErrorCode(response: Response) {
 }
 
 function defaultLaunchApp(url: string) {
+  const injected = (window as Window & {
+    __CMCC_LAUNCH_APP__?: (value: string) => void;
+  }).__CMCC_LAUNCH_APP__;
+  if (injected) {
+    injected(url);
+    return;
+  }
   window.location.href = url;
 }
 
