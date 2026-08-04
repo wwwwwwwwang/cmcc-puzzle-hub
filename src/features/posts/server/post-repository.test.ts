@@ -164,4 +164,47 @@ describe("listPosts", () => {
     expect(first.nextCursor).toBeTruthy();
     expect(second.items.map(({ id }) => id)).toEqual([posts[2].id]);
   });
+
+  it("跨 40 条扫描时清理孤立项不会跳过后续有效记录", async () => {
+    const ids = Array.from({ length: 41 }, (_, index) =>
+      `p_1800086400000_123e4567-e89b-42d3-a456-${String(index).padStart(12, "0")}`,
+    );
+    let activeIds = [...ids];
+    const storedById = new Map([
+      [
+        ids[40],
+        {
+          ...basePost,
+          id: ids[40],
+        } satisfies StoredPost,
+      ],
+    ]);
+    const redis = createRedis({
+      zrange: vi.fn(async (_key, _max, _min, options) =>
+        activeIds
+          .slice(options.offset, options.offset + options.count)
+          .flatMap((id, index) => [id, 100 - options.offset - index]),
+      ),
+      mget: vi.fn(async (...keys: string[]) =>
+        keys.map((key) => {
+          const id = key.slice("post:".length);
+          return storedById.get(id) ?? null;
+        }),
+      ),
+      zrem: vi.fn(async (_key, ...members: string[]) => {
+        activeIds = activeIds.filter((id) => !members.includes(id));
+        return members.length;
+      }),
+    });
+
+    const page = await listPosts({ limit: 20 }, { redis });
+
+    expect(page.items.map(({ id }) => id)).toEqual([ids[40]]);
+    expect(redis.zrem).toHaveBeenCalledTimes(12);
+    expect(
+      vi.mocked(redis.zrem).mock.calls.every(([, ...members]) =>
+        members.length === 40 && members[0] === ids[0] && members[39] === ids[39],
+      ),
+    ).toBe(true);
+  });
 });

@@ -143,6 +143,7 @@ export async function listPosts(
   const cursor = decodeCursor(filters.cursor);
   const collected: ScoredPostId[] = [];
   const posts = new Map<string, StoredPost>();
+  const orphanIds: string[] = [];
   let offset = 0;
   let exhausted = false;
 
@@ -173,8 +174,6 @@ export async function listPosts(
     const values = await redis.mget(
       ...entries.map(({ id }) => postKey(id, options.prefix)),
     );
-    const orphanIds: string[] = [];
-
     entries.forEach((entry, index) => {
       const storedPost = values[index];
       if (!storedPost) {
@@ -184,10 +183,10 @@ export async function listPosts(
       posts.set(entry.id, storedPost);
       collected.push(entry);
     });
+  }
 
-    if (orphanIds.length > 0) {
-      await cleanupOrphans(redis, orphanIds, options.prefix);
-    }
+  if (orphanIds.length > 0) {
+    await cleanupOrphans(redis, orphanIds, options.prefix);
   }
 
   const pageEntries = collected.slice(0, pageSize);
@@ -294,7 +293,5 @@ async function cleanupOrphans(
     ),
   ];
 
-  await Promise.all(
-    indexKeys.flatMap((key) => orphanIds.map((id) => redis.zrem(key, id))),
-  );
+  await Promise.all(indexKeys.map((key) => redis.zrem(key, ...orphanIds)));
 }

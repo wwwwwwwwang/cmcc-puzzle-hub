@@ -47,12 +47,8 @@ suite(
         createdAt: createdAt.toISOString(),
         expiresAt: expiresAt.toISOString(),
       };
-
-      const first = await repository.publishPost(input, { redis, prefix });
-      expect(first.status).toBe("CREATED");
-      if (first.status !== "CREATED") throw new Error("expected created post");
-
-      const postRedisKey = keys.postKey(first.post.id, prefix);
+      const firstUuid = "00000000-0000-4000-8000-000000000001";
+      const firstId = `p_${expiresAt.getTime()}_${firstUuid}`;
       const dedupeRedisKey = keys.dedupeKey(input.payloadHash, prefix);
       const indexKeys = [
         keys.allIndexKey(prefix),
@@ -60,10 +56,24 @@ suite(
         keys.discountIndexKey(input.discount, prefix),
         keys.typeDiscountIndexKey(input.type, input.discount, prefix),
       ];
-      [postRedisKey, dedupeRedisKey, ...indexKeys].forEach((key) => explicitKeys.add(key));
+      [keys.postKey(firstId, prefix), dedupeRedisKey, ...indexKeys].forEach((key) =>
+        explicitKeys.add(key),
+      );
+
+      const first = await repository.publishPost(input, {
+        redis,
+        prefix,
+        randomUUID: () => firstUuid,
+      });
+      expect(first.status).toBe("CREATED");
+      if (first.status !== "CREATED") throw new Error("expected created post");
+
+      const postRedisKey = keys.postKey(first.post.id, prefix);
 
       expect(await redis.ttl(postRedisKey)).toBeGreaterThanOrEqual(86_390);
       expect(await redis.ttl(postRedisKey)).toBeLessThanOrEqual(86_400);
+      expect(await redis.ttl(dedupeRedisKey)).toBeGreaterThanOrEqual(86_390);
+      expect(await redis.ttl(dedupeRedisKey)).toBeLessThanOrEqual(86_400);
       for (const indexKey of indexKeys) {
         expect(await redis.zscore(indexKey, first.post.id)).not.toBeNull();
       }
@@ -96,13 +106,13 @@ suite(
         },
       ];
 
-      for (const otherInput of otherInputs) {
-        const result = await repository.publishPost(otherInput, { redis, prefix });
-        expect(result.status).toBe("CREATED");
-        if (result.status !== "CREATED") throw new Error("expected created post");
+      for (const [index, otherInput] of otherInputs.entries()) {
+        const uuid = `00000000-0000-4000-8000-${String(index + 2).padStart(12, "0")}`;
+        const id = `p_${expiresAt.getTime()}_${uuid}`;
         [
-          keys.postKey(result.post.id, prefix),
+          keys.postKey(id, prefix),
           keys.dedupeKey(otherInput.payloadHash, prefix),
+          keys.allIndexKey(prefix),
           keys.typeIndexKey(otherInput.type, prefix),
           keys.discountIndexKey(otherInput.discount, prefix),
           keys.typeDiscountIndexKey(
@@ -111,6 +121,14 @@ suite(
             prefix,
           ),
         ].forEach((key) => explicitKeys.add(key));
+
+        const result = await repository.publishPost(otherInput, {
+          redis,
+          prefix,
+          randomUUID: () => uuid,
+        });
+        expect(result.status).toBe("CREATED");
+        if (result.status !== "CREATED") throw new Error("expected created post");
       }
 
       const give95 = await repository.listPosts(
