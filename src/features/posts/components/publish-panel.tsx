@@ -1,15 +1,17 @@
 "use client";
 
+import { CheckCircle2, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useDeviceIdentity } from "@/features/posts/device/device-provider";
 import { DomainError } from "@/features/posts/domain/errors";
-import { parseSource } from "@/features/posts/domain/parse-source";
+import { parseSources } from "@/features/posts/domain/parse-source";
 import type { CreatePostInput } from "@/features/posts/domain/schemas";
-import type { Discount, ParsedSource } from "@/features/posts/domain/types";
+import type { Discount } from "@/features/posts/domain/types";
 
 import { QrImagePicker, type DecodeImage } from "./qr-image-picker";
 
@@ -21,26 +23,21 @@ type PublishPanelProps = {
 
 const discountLabel = { 95: "95折", 90: "9折", 80: "8折" } as const;
 const typeLabel = { GIVE: "赠送", REQUEST: "求助" } as const;
-
 const apiErrorMessage: Record<string, string> = {
   INVALID_INPUT: "发布信息有误，请检查后重试",
   INVALID_CONTENT: "内容无法识别，请检查后重试",
-  SELECTION_MISMATCH: "口令拼图与当前选择不一致",
+  SELECTION_MISMATCH: "口令与二维码对应的拼图不一致",
   DUPLICATE_POST: "这条内容已经发布过了",
   RATE_LIMITED: "发布过于频繁，请稍后再试",
   SERVICE_UNAVAILABLE: "服务暂时不可用，请稍后重试",
 };
 
-export function PublishPanel({
-  discount,
-  pieceNumber,
-  decodeImage,
-}: PublishPanelProps) {
+export function PublishPanel({ discount, pieceNumber, decodeImage }: PublishPanelProps) {
   const router = useRouter();
   const identity = useDeviceIdentity();
   const [command, setCommand] = useState("");
   const [qrUrl, setQrUrl] = useState("");
-  const [sourceKind, setSourceKind] = useState<"COMMAND" | "URL">("COMMAND");
+  const [activeSource, setActiveSource] = useState<"COMMAND" | "URL">("COMMAND");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
@@ -48,55 +45,40 @@ export function PublishPanel({
     () => (pieceNumber === null ? null : { discount, pieceNumber }),
     [discount, pieceNumber],
   );
-  const sourceValue = sourceKind === "COMMAND" ? command : qrUrl;
-
+  const sources = useMemo(
+    () => ({
+      ...(command.trim() ? { command } : {}),
+      ...(qrUrl.trim() ? { url: qrUrl } : {}),
+    }),
+    [command, qrUrl],
+  );
   const preview = useMemo(() => {
-    if (!selection || !sourceValue.trim()) {
+    if (!selection || Object.keys(sources).length === 0) {
       return { parsed: null, error: null };
     }
-
     try {
-      return {
-        parsed: parseSource({ kind: sourceKind, value: sourceValue }, selection),
-        error: null,
-      };
+      return { parsed: parseSources(sources, selection), error: null };
     } catch (error) {
       return {
         parsed: null,
-        error:
-          error instanceof DomainError
-            ? error.message
-            : "内容无法识别，请检查后重试",
+        error: error instanceof DomainError ? error.message : "内容无法识别，请检查后重试",
       };
     }
-  }, [selection, sourceKind, sourceValue]);
-
+  }, [selection, sources]);
   const canSubmit = Boolean(
-    selection &&
-      preview.parsed &&
-      identity.status === "ready" &&
-      identity.visitorId !== null &&
-      !submitting,
+    selection && preview.parsed && identity.status === "ready" && identity.visitorId && !submitting,
   );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (
-      !selection ||
-      !preview.parsed ||
-      identity.status !== "ready" ||
-      identity.visitorId === null ||
-      submittingRef.current
-    ) {
-      return;
-    }
+    if (!selection || !preview.parsed || identity.status !== "ready" || !identity.visitorId || submittingRef.current) return;
 
     submittingRef.current = true;
     setSubmitting(true);
     setSubmitError(null);
     const input: CreatePostInput = {
       selection,
-      source: { kind: sourceKind, value: sourceValue },
+      sources: { command: command.trim() || undefined, url: qrUrl.trim() || undefined },
       visitorId: identity.visitorId,
     };
 
@@ -106,13 +88,11 @@ export function PublishPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       });
-
       if (!response.ok) {
         const code = await readErrorCode(response);
         setSubmitError(apiErrorMessage[code] ?? "发布失败，请稍后重试");
         return;
       }
-
       setCommand("");
       setQrUrl("");
       router.push("/");
@@ -124,73 +104,79 @@ export function PublishPanel({
     }
   }
 
-  function handleDecoded(url: string) {
-    setQrUrl(url);
-    setSourceKind("URL");
-    setSubmitError(null);
-  }
-
-  const parsed = preview.parsed as ParsedSource | null;
+  const sourceSummary = [command.trim() ? "口令" : null, qrUrl ? "链接" : null]
+    .filter(Boolean)
+    .join(" + ");
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
-      <div className="space-y-2">
-        <label htmlFor="post-command" className="text-sm font-medium text-slate-800">
-          拼图口令
-        </label>
-        <Textarea
-          id="post-command"
-          aria-label="拼图口令"
-          placeholder={selection ? "粘贴中国移动拼图口令" : "请先选择拼图"}
-          value={command}
-          disabled={!selection || submitting}
-          onChange={(event) => {
-            setCommand(event.target.value);
-            setSourceKind("COMMAND");
-            setSubmitError(null);
-          }}
-        />
-      </div>
+      <Tabs
+        value={activeSource}
+        onValueChange={(value) => setActiveSource(value as "COMMAND" | "URL")}
+        className="gap-3"
+      >
+        <TabsList className="grid h-10 w-full grid-cols-2">
+          <TabsTrigger value="COMMAND">
+            粘贴口令
+            {command.trim() && !preview.error ? <CheckCircle2 aria-hidden="true" className="text-emerald-600" /> : null}
+          </TabsTrigger>
+          <TabsTrigger value="URL">
+            上传二维码
+            {qrUrl && !preview.error ? <CheckCircle2 aria-hidden="true" className="text-emerald-600" /> : null}
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="flex items-start justify-between gap-3">
-        <QrImagePicker
-          disabled={!selection || submitting}
-          decodeImage={decodeImage}
-          onDecoded={handleDecoded}
-        />
-        <span className="pt-2 text-xs text-slate-500">图片只在本机识别</span>
-      </div>
+        <TabsContent value="COMMAND" className="space-y-2">
+          <label htmlFor="post-command" className="text-sm font-medium text-slate-800">中国移动拼图口令</label>
+          <Textarea
+            id="post-command"
+            aria-label="拼图口令"
+            placeholder={selection ? "粘贴中国移动拼图口令" : "请先选择拼图"}
+            value={command}
+            disabled={!selection || submitting}
+            onChange={(event) => { setCommand(event.target.value); setSubmitError(null); }}
+          />
+          {command ? (
+            <Button type="button" size="sm" variant="ghost" onClick={() => setCommand("")} disabled={submitting}>
+              <Trash2 aria-hidden="true" />清除口令
+            </Button>
+          ) : null}
+        </TabsContent>
 
-      {parsed && selection ? (
-        <p className="rounded-xl bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700">
-          {discountLabel[selection.discount]}{selection.pieceNumber}号·{typeLabel[parsed.type]}
-        </p>
+        <TabsContent value="URL" className="space-y-3">
+          <QrImagePicker
+            disabled={!selection || submitting}
+            decodeImage={decodeImage}
+            onDecoded={(url) => { setQrUrl(url); setSubmitError(null); }}
+          />
+          <p className="text-xs text-slate-500">图片只在本机识别，不会上传</p>
+          {qrUrl ? (
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              <span>二维码链接已识别</span>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setQrUrl("")} disabled={submitting}>
+                <Trash2 aria-hidden="true" />清除链接
+              </Button>
+            </div>
+          ) : null}
+        </TabsContent>
+      </Tabs>
+
+      {preview.parsed && selection ? (
+        <div className="space-y-1 rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700">
+          <p>{discountLabel[selection.discount]}{selection.pieceNumber}号·{typeLabel[preview.parsed.type]}</p>
+          <p>将保存：{sourceSummary}</p>
+        </div>
       ) : null}
-      {preview.error ? (
-        <p role="alert" className="text-sm text-red-600">
-          {preview.error}
-        </p>
-      ) : null}
-      {submitError ? (
-        <p role="alert" className="text-sm text-red-600">
-          {submitError}
-        </p>
-      ) : null}
+      {preview.error ? <p role="alert" className="text-sm text-red-600">{preview.error}</p> : null}
+      {submitError ? <p role="alert" className="text-sm text-red-600">{submitError}</p> : null}
       {identity.status === "error" ? (
         <div className="flex items-center justify-between gap-3 text-sm text-red-600">
           <span>设备身份加载失败</span>
-          <Button type="button" variant="outline" size="sm" onClick={identity.retry}>
-            重试
-          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={identity.retry}>重试</Button>
         </div>
       ) : null}
-
       <Button type="submit" className="h-11 w-full" disabled={!canSubmit}>
-        {identity.status === "loading"
-          ? "正在准备身份…"
-          : submitting
-            ? "正在发布…"
-            : "发布"}
+        {identity.status === "loading" ? "正在准备身份…" : submitting ? "正在发布…" : "发布"}
       </Button>
     </form>
   );

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { GIVE_COMMAND } from "../../../../tests/fixtures/cmcc-samples";
+import { GIVE_COMMAND, GIVE_URL } from "../../../../tests/fixtures/cmcc-samples";
 import { PublishPanel } from "./publish-panel";
 import type { DeviceIdentity } from "@/features/posts/device/device-provider";
 
@@ -43,6 +43,7 @@ describe("PublishPanel", () => {
     renderPanel({ pieceNumber: null });
 
     expect(screen.getByLabelText("拼图口令")).toBeDisabled();
+    fireEvent.click(screen.getByRole("tab", { name: "上传二维码" }));
     expect(screen.getByRole("button", { name: "选择二维码图片" })).toBeDisabled();
   });
 
@@ -53,6 +54,23 @@ describe("PublishPanel", () => {
     });
 
     expect(await screen.findByText("8折6号·赠送")).toBeInTheDocument();
+  });
+
+  it("切换标签时保留口令和二维码来源", async () => {
+    renderPanel({ decodeImage: vi.fn(async () => GIVE_URL) });
+    fireEvent.change(screen.getByLabelText("拼图口令"), {
+      target: { value: GIVE_COMMAND },
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "上传二维码" }));
+    fireEvent.change(screen.getByLabelText("选择二维码图片"), {
+      target: {
+        files: [new File(["png"], "puzzle.png", { type: "image/png" })],
+      },
+    });
+
+    expect(await screen.findByText("将保存：口令 + 链接")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "粘贴口令" }));
+    expect(screen.getByLabelText("拼图口令")).toHaveValue(GIVE_COMMAND);
   });
 
   it("当前选择不一致时显示错误且不请求 API", async () => {
@@ -103,6 +121,8 @@ describe("PublishPanel", () => {
       "/api/posts",
       expect.objectContaining({ method: "POST" }),
     );
+    const body = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string);
+    expect(body.sources).toEqual({ command: GIVE_COMMAND });
   });
 
   it("身份加载中禁用发布并显示加载提示", () => {
