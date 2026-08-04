@@ -28,19 +28,22 @@ const ORPHAN_CLEANUP_BATCH_SIZE = 40;
 const CLAIM_RECEIPT_TTL_SECONDS = 300;
 
 export const PUBLISH_POST_SCRIPT = `
-if redis.call("EXISTS", KEYS[2]) == 1 then
-  return "DUPLICATE"
+local dedupeCount = tonumber(ARGV[2])
+
+for index = 2, dedupeCount + 1 do
+  if redis.call("EXISTS", KEYS[index]) == 1 then
+    return "DUPLICATE"
+  end
 end
 
-if not redis.call("SET", KEYS[2], "1", "EX", ARGV[2], "NX") then
-  return "DUPLICATE"
+for index = 2, dedupeCount + 1 do
+  redis.call("SET", KEYS[index], "1", "EX", ARGV[3])
 end
 
-redis.call("SET", KEYS[1], ARGV[1], "EX", ARGV[2])
-redis.call("ZADD", KEYS[3], ARGV[3], ARGV[4])
-redis.call("ZADD", KEYS[4], ARGV[3], ARGV[4])
-redis.call("ZADD", KEYS[5], ARGV[3], ARGV[4])
-redis.call("ZADD", KEYS[6], ARGV[3], ARGV[4])
+redis.call("SET", KEYS[1], ARGV[1], "EX", ARGV[3])
+for index = dedupeCount + 2, #KEYS do
+  redis.call("ZADD", KEYS[index], ARGV[4], ARGV[5])
+end
 
 return "CREATED"
 `;
@@ -100,8 +103,7 @@ export type HallPostPage = {
 export type ClaimPostResult =
   | {
       status: "CLAIMED";
-      payloadKind: "COMMAND" | "URL";
-      payload: string;
+      payloads: StoredPost["payloads"];
       idempotent: boolean;
     }
   | { status: "SELF_CLAIM_FORBIDDEN" }
@@ -132,7 +134,9 @@ export async function publishPost(
     PUBLISH_POST_SCRIPT,
     [
       postKey(storedPost.id, options.prefix),
-      dedupeKey(storedPost.payloadHash, options.prefix),
+      ...Object.values(storedPost.payloadHashes).map((hash) =>
+        dedupeKey(hash, options.prefix),
+      ),
       allIndexKey(options.prefix),
       typeIndexKey(storedPost.type, options.prefix),
       discountIndexKey(storedPost.discount, options.prefix),
@@ -140,6 +144,7 @@ export async function publishPost(
     ],
     [
       JSON.stringify(storedPost),
+      String(Object.keys(storedPost.payloadHashes).length),
       String(POST_TTL_SECONDS),
       String(createdAtMillis),
       storedPost.id,
@@ -204,7 +209,7 @@ export async function listPosts(
       ...entries.map(({ id }) => postKey(id, options.prefix)),
     );
     entries.forEach((entry, index) => {
-      const storedPost = values[index];
+      const storedPost = normalizeStoredPost(values[index]);
       if (!storedPost) {
         orphanIds.push(entry.id);
         return;
@@ -265,6 +270,7 @@ export async function claimPost(
       id,
       String((options.now ?? Date.now)()),
       String(parsedId.expiresAtMillis),
+      options.prefix ? `${options.prefix}:dedupe:` : "dedupe:",
     ],
   );
 
@@ -337,7 +343,7 @@ function toHallPostDto(post: StoredPost): HallPostDto {
     type: post.type,
     discount: post.discount,
     pieceNumber: post.pieceNumber,
-    payloadKind: post.payloadKind,
+    availablePayloadKinds: post.availablePayloadKinds,
     createdAt: post.createdAt,
     expiresAt: post.expiresAt,
   };
@@ -386,16 +392,14 @@ function parseClaimResult(value: unknown): ClaimPostResult {
   switch (parsed.status) {
     case "CLAIMED":
       if (
-        (parsed.payloadKind !== "COMMAND" && parsed.payloadKind !== "URL") ||
-        typeof parsed.payload !== "string" ||
+        !isPayloads(parsed.payloads) ||
         typeof parsed.idempotent !== "boolean"
       ) {
         throw new Error("Invalid claim script result");
       }
       return {
         status: "CLAIMED",
-        payloadKind: parsed.payloadKind,
-        payload: parsed.payload,
+        payloads: parsed.payloads,
         idempotent: parsed.idempotent,
       };
     case "SELF_CLAIM_FORBIDDEN":
@@ -411,4 +415,42 @@ function parseClaimResult(value: unknown): ClaimPostResult {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isPayloads(value: unknown): value is StoredPost["payloads"] {
+  if (!isRecord(value)) return false;
+  const command = value.command;
+  const url = value.url;
+  return (
+    (typeof command === "string" || typeof url === "string") &&
+    (command === undefined || typeof command === "string") &&
+    (url === undefined || typeof url === "string")
+  );
+}
+
+type LegacyStoredPost = Omit<StoredPost, "availablePayloadKinds" | "payloads" | "payloadHashes"> & {
+  payloadKind: "COMMAND" | "URL";
+  payload: string;
+  payloadHash: string;
+};
+
+function normalizeStoredPost(value: StoredPost | LegacyStoredPost | null): StoredPost | null {
+  if (!value) return null;
+  if ("payloads" in value) return value;
+
+  const command = value.payloadKind === "COMMAND" ? value.payload : undefined;
+  const url = value.payloadKind === "URL" ? value.payload : undefined;
+  const commandHash = value.payloadKind === "COMMAND" ? value.payloadHash : undefined;
+  const urlHash = value.payloadKind === "URL" ? value.payloadHash : undefined;
+  const { payloadKind, payload, payloadHash, ...rest } = value;
+
+  return {
+    ...rest,
+    availablePayloadKinds: [payloadKind],
+    payloads: { ...(command ? { command } : {}), ...(url ? { url } : {}) },
+    payloadHashes: {
+      ...(commandHash ? { command: commandHash } : {}),
+      ...(urlHash ? { url: urlHash } : {}),
+    },
+  };
 }

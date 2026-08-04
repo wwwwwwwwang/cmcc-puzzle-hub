@@ -16,10 +16,16 @@ const basePost: Omit<StoredPost, "id"> = {
   type: "GIVE",
   discount: 95,
   pieceNumber: 2,
-  payloadKind: "COMMAND",
-  payload: "secret-command",
+  availablePayloadKinds: ["COMMAND", "URL"],
+  payloads: {
+    command: "secret-command",
+    url: "https://h.app.coc.10086.cn/secret",
+  },
   publisherDeviceHash: "publisher-hash",
-  payloadHash: "payload-hash",
+  payloadHashes: {
+    command: "command-hash",
+    url: "url-hash",
+  },
   createdAt: "2027-01-15T08:00:00.000Z",
   expiresAt: "2027-01-16T08:00:00.000Z",
 };
@@ -36,7 +42,7 @@ function createRedis(overrides: Partial<PostRedis> = {}): PostRedis {
 }
 
 describe("publishPost", () => {
-  it("通过单个 Lua 调用写入详情、去重键和四个索引", async () => {
+  it("通过单个 Lua 调用写入详情、双去重键和四个索引", async () => {
     const redis = createRedis();
 
     const result = await publishPost(basePost, {
@@ -56,19 +62,21 @@ describe("publishPost", () => {
     expect(script).toBe(PUBLISH_POST_SCRIPT);
     expect(keys).toEqual([
       `test:run:post:${result.post.id}`,
-      "test:run:dedupe:payload-hash",
+      "test:run:dedupe:command-hash",
+      "test:run:dedupe:url-hash",
       "test:run:hall:posts",
       "test:run:hall:type:GIVE",
       "test:run:hall:discount:95",
       "test:run:hall:type:GIVE:discount:95",
     ]);
-    expect(args[1]).toBe("86400");
-    expect(args[2]).toBe(String(Date.parse(basePost.createdAt)));
+    expect(args[1]).toBe("2");
+    expect(args[2]).toBe("86400");
+    expect(args[3]).toBe(String(Date.parse(basePost.createdAt)));
     expect(JSON.parse(args[0])).toMatchObject({
       id: result.post.id,
-      payload: "secret-command",
+      payloads: basePost.payloads,
       publisherDeviceHash: "publisher-hash",
-      payloadHash: "payload-hash",
+      payloadHashes: basePost.payloadHashes,
     });
   });
 
@@ -113,14 +121,40 @@ describe("listPosts", () => {
         type: "GIVE",
         discount: 95,
         pieceNumber: 2,
-        payloadKind: "COMMAND",
+        availablePayloadKinds: ["COMMAND", "URL"],
         createdAt: stored.createdAt,
         expiresAt: stored.expiresAt,
       },
     ]);
-    expect(page.items[0]).not.toHaveProperty("payload");
+    expect(page.items[0]).not.toHaveProperty("payloads");
     expect(page.items[0]).not.toHaveProperty("publisherDeviceHash");
-    expect(page.items[0]).not.toHaveProperty("payloadHash");
+    expect(page.items[0]).not.toHaveProperty("payloadHashes");
+  });
+
+  it("在 TTL 兼容窗口内读取旧单载荷记录", async () => {
+    const legacy = {
+      id: "p_1800086400000_123e4567-e89b-42d3-a456-426614174000",
+      type: "GIVE",
+      discount: 95,
+      pieceNumber: 2,
+      payloadKind: "COMMAND",
+      payload: "secret-command",
+      publisherDeviceHash: "publisher-hash",
+      payloadHash: "legacy-hash",
+      createdAt: basePost.createdAt,
+      expiresAt: basePost.expiresAt,
+    };
+    const redis = createRedis({
+      zrange: vi.fn(async () => [legacy.id, Date.parse(legacy.createdAt)]),
+      mget: vi.fn(async () => [legacy as unknown as StoredPost]),
+    });
+
+    const page = await listPosts({}, { redis });
+
+    expect(page.items[0]).toMatchObject({
+      id: legacy.id,
+      availablePayloadKinds: ["COMMAND"],
+    });
   });
 
   it("丢弃空详情并从所有可能索引惰性清理孤立 ID", async () => {
@@ -255,8 +289,7 @@ describe("claimPost", () => {
       eval: vi.fn(async () =>
         JSON.stringify({
           status: "CLAIMED",
-          payloadKind: "COMMAND",
-          payload: "secret-command",
+          payloads: basePost.payloads,
           idempotent: false,
         }),
       ),
@@ -270,8 +303,7 @@ describe("claimPost", () => {
       }),
     ).resolves.toEqual({
       status: "CLAIMED",
-      payloadKind: "COMMAND",
-      payload: "secret-command",
+      payloads: basePost.payloads,
       idempotent: false,
     });
 
@@ -291,6 +323,7 @@ describe("claimPost", () => {
       postId,
       "1700000000000",
       "1800086400000",
+      "test:run:dedupe:",
     ]);
   });
 
@@ -313,8 +346,7 @@ describe("claimPost", () => {
       eval: vi.fn(async () =>
         JSON.stringify({
           status: "CLAIMED",
-          payloadKind: "URL",
-          payload: "https://example.com/secret",
+          payloads: { url: "https://example.com/secret" },
           idempotent: true,
         }),
       ),
@@ -322,8 +354,7 @@ describe("claimPost", () => {
 
     await expect(claimPost(postId, "claimant-hash", { redis })).resolves.toEqual({
       status: "CLAIMED",
-      payloadKind: "URL",
-      payload: "https://example.com/secret",
+      payloads: { url: "https://example.com/secret" },
       idempotent: true,
     });
   });

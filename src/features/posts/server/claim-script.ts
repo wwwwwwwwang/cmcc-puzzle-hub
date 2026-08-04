@@ -5,8 +5,7 @@ if receiptJson then
   if receipt.claimantDeviceHash == ARGV[1] then
     return cjson.encode({
       status = "CLAIMED",
-      payloadKind = receipt.payloadKind,
-      payload = receipt.payload,
+      payloads = receipt.payloads,
       idempotent = true
     })
   end
@@ -26,21 +25,36 @@ if post.publisherDeviceHash == ARGV[1] then
   return cjson.encode({ status = "SELF_CLAIM_FORBIDDEN" })
 end
 
+local payloads = post.payloads
+local payloadHashes = post.payloadHashes
+if not payloads then
+  payloads = {}
+  payloadHashes = {}
+  if post.payloadKind == "COMMAND" then
+    payloads.command = post.payload
+    payloadHashes.command = post.payloadHash
+  else
+    payloads.url = post.payload
+    payloadHashes.url = post.payloadHash
+  end
+end
+
 local receipt = cjson.encode({
   claimantDeviceHash = ARGV[1],
-  payloadKind = post.payloadKind,
-  payload = post.payload
+  payloads = payloads
 })
 redis.call("SET", KEYS[1], receipt, "EX", ARGV[2])
 redis.call("DEL", KEYS[2])
+for _, hash in pairs(payloadHashes) do
+  redis.call("DEL", ARGV[6] .. hash)
+end
 for index = 3, #KEYS do
   redis.call("ZREM", KEYS[index], ARGV[3])
 end
 
 return cjson.encode({
   status = "CLAIMED",
-  payloadKind = post.payloadKind,
-  payload = post.payload,
+  payloads = payloads,
   idempotent = false
 })
 `;
