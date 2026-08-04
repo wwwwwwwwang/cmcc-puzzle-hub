@@ -38,6 +38,7 @@ yarn-error.log*
 
 # local agent state
 .superpowers/
+.worktrees/
 
 # vercel
 .vercel
