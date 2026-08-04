@@ -17,14 +17,14 @@ const selectionSchema = z
     }
   });
 
-const sourceSchema = z.discriminatedUnion("type", [
+const sourceSchema = z.discriminatedUnion("kind", [
   z.object({
-    type: z.literal("COMMAND"),
-    value: z.string().max(1000),
+    kind: z.literal("COMMAND"),
+    value: z.string().trim().min(1).max(1000),
   }),
   z.object({
-    type: z.literal("URL"),
-    value: z.string().max(4096),
+    kind: z.literal("URL"),
+    value: z.string().trim().min(1).max(4096),
   }),
 ]);
 
