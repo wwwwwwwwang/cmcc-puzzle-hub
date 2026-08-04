@@ -4,11 +4,13 @@ vi.mock("server-only", () => ({}));
 
 import type { StoredPost } from "../domain/types";
 import {
+  claimPost,
   listPosts,
   PUBLISH_POST_SCRIPT,
   publishPost,
   type PostRedis,
 } from "./post-repository";
+import { CLAIM_POST_SCRIPT } from "./claim-script";
 
 const basePost: Omit<StoredPost, "id"> = {
   type: "GIVE",
@@ -206,5 +208,107 @@ describe("listPosts", () => {
         members.length === 40 && members[0] === ids[0] && members[39] === ids[39],
       ),
     ).toBe(true);
+  });
+});
+
+describe("claimPost", () => {
+  const postId =
+    "p_1800086400000_123e4567-e89b-42d3-a456-426614174000";
+
+  it("严格拒绝非法 ID 且不调用 Redis", async () => {
+    const redis = createRedis();
+
+    await expect(
+      claimPost("invalid-post-id", "claimant-hash", { redis }),
+    ).resolves.toEqual({ status: "INVALID_POST_ID" });
+    expect(redis.eval).not.toHaveBeenCalled();
+  });
+
+  it("向 Lua 传递领取键、详情键、全部候选索引和服务端时间", async () => {
+    const redis = createRedis({
+      eval: vi.fn(async () =>
+        JSON.stringify({
+          status: "CLAIMED",
+          payloadKind: "COMMAND",
+          payload: "secret-command",
+          idempotent: false,
+        }),
+      ),
+    });
+
+    await expect(
+      claimPost(postId, "claimant-hash", {
+        redis,
+        prefix: "test:run",
+        now: () => 1_700_000_000_000,
+      }),
+    ).resolves.toEqual({
+      status: "CLAIMED",
+      payloadKind: "COMMAND",
+      payload: "secret-command",
+      idempotent: false,
+    });
+
+    const [script, keys, args] = vi.mocked(redis.eval).mock.calls[0];
+    expect(script).toBe(CLAIM_POST_SCRIPT);
+    expect(keys).toHaveLength(14);
+    expect(keys.slice(0, 3)).toEqual([
+      `test:run:claim:${postId}`,
+      `test:run:post:${postId}`,
+      "test:run:hall:posts",
+    ]);
+    expect(keys).toContain("test:run:hall:type:GIVE:discount:95");
+    expect(keys).toContain("test:run:hall:type:REQUEST:discount:80");
+    expect(args).toEqual([
+      "claimant-hash",
+      "300",
+      postId,
+      "1700000000000",
+      "1800086400000",
+    ]);
+  });
+
+  it.each([
+    ["SELF_CLAIM_FORBIDDEN", { status: "SELF_CLAIM_FORBIDDEN" }],
+    ["ALREADY_CLAIMED", { status: "ALREADY_CLAIMED" }],
+    ["EXPIRED", { status: "EXPIRED" }],
+  ] as const)("解析稳定状态 %s", async (status, expected) => {
+    const redis = createRedis({
+      eval: vi.fn(async () => JSON.stringify({ status })),
+    });
+
+    await expect(claimPost(postId, "claimant-hash", { redis })).resolves.toEqual(
+      expected,
+    );
+  });
+
+  it("解析同设备幂等领取载荷", async () => {
+    const redis = createRedis({
+      eval: vi.fn(async () =>
+        JSON.stringify({
+          status: "CLAIMED",
+          payloadKind: "URL",
+          payload: "https://example.com/secret",
+          idempotent: true,
+        }),
+      ),
+    });
+
+    await expect(claimPost(postId, "claimant-hash", { redis })).resolves.toEqual({
+      status: "CLAIMED",
+      payloadKind: "URL",
+      payload: "https://example.com/secret",
+      idempotent: true,
+    });
+  });
+
+  it("拒绝未知或畸形 Lua 结果", async () => {
+    const redis = createRedis({
+      eval: vi.fn(async () => JSON.stringify({ status: "UNKNOWN" })),
+    });
+
+    await expect(claimPost(postId, "claimant-hash", { redis })).rejects.toThrow(
+      /claim script result/i,
+    );
   });
 });

@@ -8,19 +8,23 @@ import type {
 } from "../domain/types";
 import {
   allIndexKey,
+  claimKey,
   createPostId,
   dedupeKey,
   discountIndexKey,
   postKey,
+  parsePostId,
   typeDiscountIndexKey,
   typeIndexKey,
 } from "./keys";
+import { CLAIM_POST_SCRIPT } from "./claim-script";
 import { getRedis } from "./redis";
 
 const POST_TTL_SECONDS = 86_400;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 20;
 const READ_BATCH_SIZE = 40;
+const CLAIM_RECEIPT_TTL_SECONDS = 300;
 
 export const PUBLISH_POST_SCRIPT = `
 if redis.call("EXISTS", KEYS[2]) == 1 then
@@ -68,6 +72,7 @@ type RepositoryOptions = {
   redis?: PostRedis;
   prefix?: string;
   randomUUID?: () => string;
+  now?: () => number;
 };
 
 type PublishPostResult =
@@ -85,6 +90,18 @@ export type HallPostPage = {
   items: HallPostDto[];
   nextCursor: string | null;
 };
+
+export type ClaimPostResult =
+  | {
+      status: "CLAIMED";
+      payloadKind: "COMMAND" | "URL";
+      payload: string;
+      idempotent: boolean;
+    }
+  | { status: "SELF_CLAIM_FORBIDDEN" }
+  | { status: "ALREADY_CLAIMED" }
+  | { status: "EXPIRED" }
+  | { status: "INVALID_POST_ID" };
 
 type Cursor = { score: number; id: string };
 type ScoredPostId = Cursor;
@@ -203,6 +220,45 @@ export async function listPosts(
   };
 }
 
+export async function claimPost(
+  id: string,
+  claimantDeviceHash: string,
+  options: RepositoryOptions = {},
+): Promise<ClaimPostResult> {
+  const parsedId = parsePostId(id);
+  if (!parsedId) return { status: "INVALID_POST_ID" };
+
+  const redis: PostRedis = options.redis ?? getRedis();
+  const result = await redis.eval(
+    CLAIM_POST_SCRIPT,
+    [
+      claimKey(id, options.prefix),
+      postKey(id, options.prefix),
+      allIndexKey(options.prefix),
+      typeIndexKey("GIVE", options.prefix),
+      typeIndexKey("REQUEST", options.prefix),
+      discountIndexKey(95, options.prefix),
+      discountIndexKey(90, options.prefix),
+      discountIndexKey(80, options.prefix),
+      typeDiscountIndexKey("GIVE", 95, options.prefix),
+      typeDiscountIndexKey("GIVE", 90, options.prefix),
+      typeDiscountIndexKey("GIVE", 80, options.prefix),
+      typeDiscountIndexKey("REQUEST", 95, options.prefix),
+      typeDiscountIndexKey("REQUEST", 90, options.prefix),
+      typeDiscountIndexKey("REQUEST", 80, options.prefix),
+    ],
+    [
+      claimantDeviceHash,
+      String(CLAIM_RECEIPT_TTL_SECONDS),
+      id,
+      String((options.now ?? Date.now)()),
+      String(parsedId.expiresAtMillis),
+    ],
+  );
+
+  return parseClaimResult(result);
+}
+
 function selectIndexKey(filters: ListPostFilters, prefix?: string) {
   if (filters.type && filters.discount) {
     return typeDiscountIndexKey(filters.type, filters.discount, prefix);
@@ -294,4 +350,50 @@ async function cleanupOrphans(
   ];
 
   await Promise.all(indexKeys.map((key) => redis.zrem(key, ...orphanIds)));
+}
+
+function parseClaimResult(value: unknown): ClaimPostResult {
+  if (typeof value !== "string") {
+    throw new Error("Invalid claim script result");
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("Invalid claim script result");
+  }
+
+  if (!isRecord(parsed) || typeof parsed.status !== "string") {
+    throw new Error("Invalid claim script result");
+  }
+
+  switch (parsed.status) {
+    case "CLAIMED":
+      if (
+        (parsed.payloadKind !== "COMMAND" && parsed.payloadKind !== "URL") ||
+        typeof parsed.payload !== "string" ||
+        typeof parsed.idempotent !== "boolean"
+      ) {
+        throw new Error("Invalid claim script result");
+      }
+      return {
+        status: "CLAIMED",
+        payloadKind: parsed.payloadKind,
+        payload: parsed.payload,
+        idempotent: parsed.idempotent,
+      };
+    case "SELF_CLAIM_FORBIDDEN":
+      return { status: "SELF_CLAIM_FORBIDDEN" };
+    case "ALREADY_CLAIMED":
+      return { status: "ALREADY_CLAIMED" };
+    case "EXPIRED":
+      return { status: "EXPIRED" };
+    default:
+      throw new Error("Invalid claim script result");
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
