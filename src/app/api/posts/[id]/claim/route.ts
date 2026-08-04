@@ -2,6 +2,7 @@ import { hashVisitorId } from "@/features/posts/device/hash";
 import { claimPost } from "@/features/posts/server/post-repository";
 import { claimPostInputSchema } from "@/features/posts/domain/schemas";
 import { parsePostId } from "@/features/posts/server/keys";
+import { randomUUID } from "node:crypto";
 
 export async function POST(
   request: Request,
@@ -37,6 +38,7 @@ export async function POST(
         return jsonError("INVALID_INPUT", 400);
     }
   } catch {
+    console.error(JSON.stringify({ code: "SERVICE_UNAVAILABLE", requestId: randomUUID() }));
     return jsonError("SERVICE_UNAVAILABLE", 503);
   }
 }

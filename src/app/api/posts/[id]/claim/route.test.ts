@@ -41,6 +41,24 @@ describe("/api/posts/[id]/claim", () => {
     });
   });
 
+  it("URL 载荷和 idempotent=true 仍返回 200", async () => {
+    claimPost.mockResolvedValue({
+      status: "CLAIMED",
+      payloadKind: "URL",
+      payload: "https://example.com/secret",
+      idempotent: true,
+    });
+    const response = await POST(
+      request({ visitorId: "visitor-id-123" }),
+      { params: Promise.resolve({ id: "p_1800000000000_123e4567-e89b-42d3-a456-426614174000" }) },
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      payloadKind: "URL",
+      payload: "https://example.com/secret",
+    });
+  });
+
   it.each([
     ["SELF_CLAIM_FORBIDDEN", 403],
     ["ALREADY_CLAIMED", 409],
@@ -64,7 +82,17 @@ describe("/api/posts/[id]/claim", () => {
     expect(claimPost).not.toHaveBeenCalled();
   });
 
+  it("合法 ID 加非法 visitorId 返回 400 且不调用仓储", async () => {
+    const response = await POST(
+      request({ visitorId: "short" }),
+      { params: Promise.resolve({ id: "p_1800000000000_123e4567-e89b-42d3-a456-426614174000" }) },
+    );
+    expect(response.status).toBe(400);
+    expect(claimPost).not.toHaveBeenCalled();
+  });
+
   it("Redis 错误返回 503/SERVICE_UNAVAILABLE", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     claimPost.mockRejectedValue(new Error("redis unavailable"));
     const response = await POST(
       request({ visitorId: "visitor-id-123" }),
@@ -74,5 +102,11 @@ describe("/api/posts/[id]/claim", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "SERVICE_UNAVAILABLE" },
     });
+    expect(error).toHaveBeenCalledOnce();
+    const log = JSON.stringify(error.mock.calls[0]);
+    expect(log).toMatch(/SERVICE_UNAVAILABLE/);
+    expect(log).toMatch(/requestId/);
+    expect(log).not.toContain("visitor-id-123");
+    error.mockRestore();
   });
 });

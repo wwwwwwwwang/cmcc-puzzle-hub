@@ -61,6 +61,22 @@ describe("/api/posts", () => {
     });
   });
 
+  it("异常日志仅记录错误码与 requestId", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    publishPost.mockRejectedValue(new Error(`redis ${GIVE_URL} visitor-id-123 token-secret`));
+
+    await POST(request(baseInput));
+
+    expect(error).toHaveBeenCalledOnce();
+    const log = JSON.stringify(error.mock.calls[0]);
+    expect(log).toMatch(/SERVICE_UNAVAILABLE/);
+    expect(log).toMatch(/requestId/);
+    expect(log).not.toContain("visitor-id-123");
+    expect(log).not.toContain(GIVE_URL);
+    expect(log).not.toContain("token-secret");
+    error.mockRestore();
+  });
+
   it.each([
     {
       name: "赠送口令",
@@ -208,7 +224,8 @@ describe("/api/posts", () => {
     "discount=70",
     "limit=21",
     "limit=0",
-    "cursor=not+base64url",
+    "cursor=abc",
+    `cursor=${Buffer.from(JSON.stringify({ score: "bad", id: "" })).toString("base64url")}`,
     "unknown=value",
   ])("GET 非法参数 %s 返回 400", async (query) => {
     const response = await GET(new Request(`http://localhost/api/posts?${query}`));
@@ -216,5 +233,28 @@ describe("/api/posts", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "INVALID_INPUT" },
     });
+    expect(listPosts).not.toHaveBeenCalled();
+  });
+
+  it("GET 仓储异常日志不泄露 cursor", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const cursor = Buffer.from(
+      JSON.stringify({
+        score: 100,
+        id: "p_1800000000000_123e4567-e89b-42d3-a456-426614174000",
+      }),
+    ).toString("base64url");
+    listPosts.mockRejectedValue(new Error(`redis cursor=${cursor} token-secret`));
+
+    const response = await GET(
+      new Request(`http://localhost/api/posts?cursor=${cursor}`),
+    );
+
+    expect(response.status).toBe(503);
+    const log = JSON.stringify(error.mock.calls[0]);
+    expect(log).toMatch(/SERVICE_UNAVAILABLE/);
+    expect(log).not.toContain(cursor);
+    expect(log).not.toContain("token-secret");
+    error.mockRestore();
   });
 });

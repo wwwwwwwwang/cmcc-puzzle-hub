@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { hashVisitorId } from "@/features/posts/device/hash";
 import { DomainError } from "@/features/posts/domain/errors";
@@ -13,6 +13,7 @@ import {
   publishPost,
 } from "@/features/posts/server/post-repository";
 import { checkPublishRateLimit } from "@/features/posts/server/rate-limit";
+import { parsePostId } from "@/features/posts/server/keys";
 
 const POST_TTL_MS = 86_400_000;
 
@@ -25,6 +26,7 @@ export async function GET(request: Request) {
     const page = await listPosts(parsed.filters);
     return Response.json(page);
   } catch {
+    logRouteError("SERVICE_UNAVAILABLE");
     return jsonError("SERVICE_UNAVAILABLE", 503);
   }
 }
@@ -73,6 +75,7 @@ export async function POST(request: Request) {
     if (error instanceof DomainError) {
       return jsonError(error.code, 400);
     }
+    logRouteError("SERVICE_UNAVAILABLE");
     return jsonError("SERVICE_UNAVAILABLE", 503);
   }
 }
@@ -107,6 +110,9 @@ function parseListQuery(searchParams: URLSearchParams) {
   if (cursor !== undefined && !/^[A-Za-z0-9_-]+$/.test(cursor)) {
     return { success: false as const, field: "cursor" };
   }
+  if (cursor !== undefined && !isValidCursor(cursor)) {
+    return { success: false as const, field: "cursor" };
+  }
 
   return {
     success: true as const,
@@ -117,6 +123,27 @@ function parseListQuery(searchParams: URLSearchParams) {
       ...(limit ? { limit } : {}),
     },
   };
+}
+
+function isValidCursor(value: string) {
+  try {
+    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+    return (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      typeof parsed.score === "number" &&
+      Number.isFinite(parsed.score) &&
+      typeof parsed.id === "string" &&
+      parsed.id.length > 0 &&
+      Boolean(parsePostId(parsed.id))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function logRouteError(code: string) {
+  console.error(JSON.stringify({ code, requestId: randomUUID() }));
 }
 
 function toHallPostDto(post: StoredPost): HallPostDto {
