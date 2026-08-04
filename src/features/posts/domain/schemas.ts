@@ -17,22 +17,20 @@ const selectionSchema = z
     }
   });
 
-const sourceSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("COMMAND"),
-    value: z.string().trim().min(1).max(1000),
-  }),
-  z.object({
-    kind: z.literal("URL"),
-    value: z.string().trim().min(1).max(4096),
-  }),
-]);
+const sourcesSchema = z
+  .object({
+    command: z.string().trim().min(1).max(1000).optional(),
+    url: z.string().trim().min(1).max(4096).optional(),
+  })
+  .refine(({ command, url }) => command !== undefined || url !== undefined, {
+    message: "至少提供一种拼图来源",
+  });
 
 const visitorIdSchema = z.string().trim().min(8).max(256);
 
 export const createPostInputSchema = z.object({
   selection: selectionSchema,
-  source: sourceSchema,
+  sources: sourcesSchema,
   visitorId: visitorIdSchema,
 });
 

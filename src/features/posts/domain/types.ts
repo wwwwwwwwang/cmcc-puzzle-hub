@@ -4,6 +4,16 @@ export type Discount = 95 | 90 | 80;
 
 export type PayloadKind = "COMMAND" | "URL";
 
+export type PostSources = {
+  command?: string;
+  url?: string;
+};
+
+export type PayloadHashes = {
+  command?: string;
+  url?: string;
+};
+
 export type PuzzleSelection = {
   discount: Discount;
   pieceNumber: number;
@@ -16,16 +26,22 @@ export type ParsedSource = {
   explicitSelection: PuzzleSelection | null;
 };
 
+export type ParsedSources = {
+  type: PostType;
+  sources: PostSources;
+  explicitSelection: PuzzleSelection | null;
+};
+
 export type HallPostDto = PuzzleSelection & {
   id: string;
   type: PostType;
-  payloadKind: PayloadKind;
+  availablePayloadKinds: PayloadKind[];
   createdAt: string;
   expiresAt: string;
 };
 
 export type StoredPost = HallPostDto & {
-  payload: string;
+  payloads: PostSources;
+  payloadHashes: PayloadHashes;
   publisherDeviceHash: string;
-  payloadHash: string;
 };

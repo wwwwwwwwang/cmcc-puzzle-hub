@@ -1,7 +1,12 @@
 import { DomainError } from "./errors";
 import { parseCommand } from "./parse-command";
 import { parseUrl } from "./parse-url";
-import type { ParsedSource, PuzzleSelection } from "./types";
+import type {
+  ParsedSource,
+  ParsedSources,
+  PostSources,
+  PuzzleSelection,
+} from "./types";
 
 type PostSource =
   | { kind: "COMMAND"; value: string }
@@ -27,4 +32,35 @@ export function parseSource(
   }
 
   return parsedSource;
+}
+
+export function parseSources(
+  sources: PostSources,
+  selection: PuzzleSelection,
+): ParsedSources {
+  const command = sources.command
+    ? parseSource({ kind: "COMMAND", value: sources.command }, selection)
+    : null;
+  const url = sources.url
+    ? parseSource({ kind: "URL", value: sources.url }, selection)
+    : null;
+
+  if (!command && !url) {
+    throw new DomainError("INVALID_CONTENT", "至少提供一种拼图来源");
+  }
+  if (command && url && command.type !== url.type) {
+    throw new DomainError(
+      "SELECTION_MISMATCH",
+      "口令与二维码对应的拼图类型不一致",
+    );
+  }
+
+  return {
+    type: (command ?? url)!.type,
+    sources: {
+      ...(command ? { command: command.payload } : {}),
+      ...(url ? { url: url.payload } : {}),
+    },
+    explicitSelection: command?.explicitSelection ?? null,
+  };
 }
