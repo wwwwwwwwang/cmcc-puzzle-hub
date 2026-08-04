@@ -49,6 +49,13 @@ export function ClaimDrawer({
   const [commandReady, setCommandReady] = useState(false);
   const submittingRef = useRef(false);
 
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen && commandReady) {
+      onClaimed(post.id);
+    }
+    onOpenChange(nextOpen);
+  }
+
   async function handleClaim() {
     if (
       identity.status !== "ready" ||
@@ -111,7 +118,7 @@ export function ClaimDrawer({
   const identityReady = identity.status === "ready" && identity.visitorId !== null;
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} showSwipeHandle>
+    <Drawer open={open} onOpenChange={handleOpenChange} showSwipeHandle>
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle>确认领取拼图</DrawerTitle>
@@ -159,7 +166,7 @@ export function ClaimDrawer({
           >
             {submitting ? "正在领取…" : "确认领取"}
           </Button>
-          <Button type="button" className="h-11" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" className="h-11" variant="outline" onClick={() => handleOpenChange(false)}>
             取消
           </Button>
         </DrawerFooter>

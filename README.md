@@ -42,6 +42,7 @@ PUBLISH_LIMIT_PER_HOUR=10
 
 - FingerprintJS 取得的 `visitorId` 会持久化到 `localStorage` 的 `cmcc-puzzle-device-id`，正常关闭并重新打开浏览器不会丢失。
 - 服务端只保存 `HMAC-SHA256(DEVICE_HASH_SECRET, visitorId)`，大厅接口不会返回 visitorId、deviceHash、payload 或 payloadHash。
+- 这是匿名设备约束，不是账号认证：恶意调用者可以伪造请求体中的 visitorId。上线时应在网关增加 IP/边缘限流；不要把该标识当作登录凭证。
 - 清除站点数据、无痕模式和浏览器存储限制会使匿名设备标识重新生成。
 - 二维码图片只在浏览器内经 Canvas 和 jsQR 解码，不上传图片、不写入请求体或日志。
 

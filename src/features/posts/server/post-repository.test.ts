@@ -30,6 +30,7 @@ function createRedis(overrides: Partial<PostRedis> = {}): PostRedis {
     zrange: vi.fn(async () => []),
     mget: vi.fn(async () => []),
     zrem: vi.fn(async () => 0),
+    zremrangebyscore: vi.fn(async () => 0),
     ...overrides,
   };
 }
@@ -207,6 +208,31 @@ describe("listPosts", () => {
       vi.mocked(redis.zrem).mock.calls.every(([, ...members]) =>
         members.length === 40 && members[0] === ids[0] && members[39] === ids[39],
       ),
+    ).toBe(true);
+  });
+
+  it("先裁剪过期索引并将孤立清理限制为每批 40 个", async () => {
+    const ids = Array.from({ length: 81 }, (_, index) =>
+      `p_1800086400000_123e4567-e89b-42d3-a456-${String(index).padStart(12, "0")}`,
+    );
+    const redis = createRedis({
+      zrange: vi.fn(async (_key, _max, _min, options) =>
+        ids
+          .slice(options.offset, options.offset + options.count)
+          .flatMap((id) => [id, 100]),
+      ),
+      mget: vi.fn(async (...keys: string[]) => keys.map(() => null)),
+    });
+
+    await listPosts({}, { redis });
+
+    expect(redis.zremrangebyscore).toHaveBeenCalledWith(
+      "hall:posts",
+      "-inf",
+      expect.any(Number),
+    );
+    expect(
+      vi.mocked(redis.zrem).mock.calls.every(([, ...members]) => members.length <= 40),
     ).toBe(true);
   });
 });

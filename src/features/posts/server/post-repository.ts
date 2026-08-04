@@ -24,6 +24,7 @@ const POST_TTL_SECONDS = 86_400;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 20;
 const READ_BATCH_SIZE = 40;
+const ORPHAN_CLEANUP_BATCH_SIZE = 40;
 const CLAIM_RECEIPT_TTL_SECONDS = 300;
 
 export const PUBLISH_POST_SCRIPT = `
@@ -66,6 +67,11 @@ export type PostRedis = {
   ) => Promise<(string | number)[]>;
   mget: (...keys: string[]) => Promise<(StoredPost | null)[]>;
   zrem: (key: string, ...members: string[]) => Promise<number>;
+  zremrangebyscore: (
+    key: string,
+    min: number | "-inf" | "+inf",
+    max: number | "-inf" | "+inf",
+  ) => Promise<number>;
 };
 
 type RepositoryOptions = {
@@ -163,6 +169,12 @@ export async function listPosts(
   const orphanIds: string[] = [];
   let offset = 0;
   let exhausted = false;
+
+  await redis.zremrangebyscore(
+    indexKey,
+    "-inf",
+    Date.now() - POST_TTL_SECONDS * 1000,
+  );
 
   while (collected.length < pageSize + 1 && !exhausted) {
     const rawEntries = await redis.zrange(
@@ -349,7 +361,10 @@ async function cleanupOrphans(
     ),
   ];
 
-  await Promise.all(indexKeys.map((key) => redis.zrem(key, ...orphanIds)));
+  for (let offset = 0; offset < orphanIds.length; offset += ORPHAN_CLEANUP_BATCH_SIZE) {
+    const batch = orphanIds.slice(offset, offset + ORPHAN_CLEANUP_BATCH_SIZE);
+    await Promise.all(indexKeys.map((key) => redis.zrem(key, ...batch)));
+  }
 }
 
 function parseClaimResult(value: unknown): ClaimPostResult {

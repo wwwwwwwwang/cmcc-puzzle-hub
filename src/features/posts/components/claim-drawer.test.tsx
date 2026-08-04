@@ -111,6 +111,24 @@ describe("ClaimDrawer", () => {
     expect(launchApp).not.toHaveBeenCalled();
   });
 
+  it("口令成功后保留提示，关闭抽屉时才移除卡片", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ payloadKind: "COMMAND", payload: "￥19uSvG￥" })),
+      ),
+    );
+    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn(async () => undefined) } });
+    const { onClaimed } = renderDrawer();
+
+    fireEvent.click(screen.getByRole("button", { name: "确认领取" }));
+    await waitFor(() => expect(screen.getByText("口令已复制")).toBeInTheDocument());
+    expect(onClaimed).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(onClaimed).toHaveBeenCalledWith(commandPost.id);
+  });
+
   it("URL 成功只在白名单 URL 通过校验后跳转", async () => {
     const payload =
       "https://h.app.coc.10086.cn/activity/zx/transit/transferDownload.html?targetUrl=https%3A%2F%2Fwx.10086.cn%2Fhlwyxhdhub%2Fact-wedrecharge%2F1024101716%3FgiveCard%3Dabc";
