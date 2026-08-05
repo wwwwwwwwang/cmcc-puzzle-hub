@@ -9,14 +9,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useDeviceIdentity } from "@/features/posts/device/device-provider";
 import { DomainError } from "@/features/posts/domain/errors";
-import { parseSources } from "@/features/posts/domain/parse-source";
+import {
+  assertPostTypeMatches,
+  parseSources,
+} from "@/features/posts/domain/parse-source";
 import type { CreatePostInput } from "@/features/posts/domain/schemas";
 import type { Discount, PostType } from "@/features/posts/domain/types";
 
 import { QrImagePicker, type DecodeImage } from "./qr-image-picker";
 
 type PublishPanelProps = {
-  postType?: PostType | null;
+  postType: PostType | null;
   discount: Discount;
   pieceNumber: number | null;
   decodeImage?: DecodeImage;
@@ -28,12 +31,18 @@ const apiErrorMessage: Record<string, string> = {
   INVALID_INPUT: "发布信息有误，请检查后重试",
   INVALID_CONTENT: "内容无法识别，请检查后重试",
   SELECTION_MISMATCH: "口令与二维码对应的拼图不一致",
+  TYPE_MISMATCH: "选择的发布类型与内容不一致，请检查后重试",
   DUPLICATE_POST: "这条内容已经发布过了",
   RATE_LIMITED: "发布过于频繁，请稍后再试",
   SERVICE_UNAVAILABLE: "服务暂时不可用，请稍后重试",
 };
 
-export function PublishPanel({ discount, pieceNumber, decodeImage }: PublishPanelProps) {
+export function PublishPanel({
+  postType,
+  discount,
+  pieceNumber,
+  decodeImage,
+}: PublishPanelProps) {
   const router = useRouter();
   const identity = useDeviceIdentity();
   const [command, setCommand] = useState("");
@@ -58,26 +67,43 @@ export function PublishPanel({ discount, pieceNumber, decodeImage }: PublishPane
       return { parsed: null, error: null };
     }
     try {
-      return { parsed: parseSources(sources, selection), error: null };
+      const parsed = parseSources(sources, selection);
+      if (postType) assertPostTypeMatches(parsed.type, postType);
+      return { parsed, error: null };
     } catch (error) {
       return {
         parsed: null,
         error: error instanceof DomainError ? error.message : "内容无法识别，请检查后重试",
       };
     }
-  }, [selection, sources]);
+  }, [postType, selection, sources]);
   const canSubmit = Boolean(
-    selection && preview.parsed && identity.status === "ready" && identity.visitorId && !submitting,
+    postType &&
+      selection &&
+      preview.parsed &&
+      identity.status === "ready" &&
+      identity.visitorId &&
+      !submitting,
   );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selection || !preview.parsed || identity.status !== "ready" || !identity.visitorId || submittingRef.current) return;
+    if (
+      !postType ||
+      !selection ||
+      !preview.parsed ||
+      identity.status !== "ready" ||
+      !identity.visitorId ||
+      submittingRef.current
+    ) {
+      return;
+    }
 
     submittingRef.current = true;
     setSubmitting(true);
     setSubmitError(null);
     const input: CreatePostInput = {
+      type: postType,
       selection,
       sources: { command: command.trim() || undefined, url: qrUrl.trim() || undefined },
       visitorId: identity.visitorId,
@@ -111,6 +137,11 @@ export function PublishPanel({ discount, pieceNumber, decodeImage }: PublishPane
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
+      {postType === null ? (
+        <p className="text-sm text-slate-500">请先选择发布类型</p>
+      ) : selection === null ? (
+        <p className="text-sm text-slate-500">请先选择拼图</p>
+      ) : null}
       <Tabs
         value={activeSource}
         onValueChange={(value) => setActiveSource(value as "COMMAND" | "URL")}
@@ -132,9 +163,15 @@ export function PublishPanel({ discount, pieceNumber, decodeImage }: PublishPane
           <Textarea
             id="post-command"
             aria-label="拼图口令"
-            placeholder={selection ? "粘贴中国移动拼图口令" : "请先选择拼图"}
+            placeholder={
+              postType === null
+                ? "请先选择发布类型"
+                : selection
+                  ? "粘贴中国移动拼图口令"
+                  : "请先选择拼图"
+            }
             value={command}
-            disabled={!selection || submitting}
+            disabled={!postType || !selection || submitting}
             onChange={(event) => { setCommand(event.target.value); setSubmitError(null); }}
           />
           {command ? (
@@ -146,7 +183,7 @@ export function PublishPanel({ discount, pieceNumber, decodeImage }: PublishPane
 
         <TabsContent value="URL" className="space-y-3">
           <QrImagePicker
-            disabled={!selection || submitting}
+            disabled={!postType || !selection || submitting}
             decodeImage={decodeImage}
             onDecoded={(url) => { setQrUrl(url); setSubmitError(null); }}
           />

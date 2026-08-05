@@ -1,7 +1,11 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { GIVE_COMMAND, GIVE_URL } from "../../../../tests/fixtures/cmcc-samples";
+import {
+  GIVE_COMMAND,
+  GIVE_URL,
+  REQUEST_COMMAND,
+} from "../../../../tests/fixtures/cmcc-samples";
 import { PublishPanel } from "./publish-panel";
 import type { DeviceIdentity } from "@/features/posts/device/device-provider";
 
@@ -23,6 +27,7 @@ vi.mock("@/features/posts/device/device-provider", () => ({
 function renderPanel(overrides: Partial<React.ComponentProps<typeof PublishPanel>> = {}) {
   return render(
     <PublishPanel
+      postType="GIVE"
       discount={80}
       pieceNumber={6}
       {...overrides}
@@ -45,6 +50,13 @@ describe("PublishPanel", () => {
     expect(screen.getByLabelText("拼图口令")).toBeDisabled();
     fireEvent.click(screen.getByRole("tab", { name: "上传二维码" }));
     expect(screen.getByRole("button", { name: "选择二维码图片" })).toBeDisabled();
+  });
+
+  it("未选择类型时禁用内容输入并提示先选类型", () => {
+    renderPanel({ postType: null });
+
+    expect(screen.getByLabelText("拼图口令")).toBeDisabled();
+    expect(screen.getByText("请先选择发布类型")).toBeInTheDocument();
   });
 
   it("粘贴真实赠送口令后显示预览", async () => {
@@ -87,6 +99,39 @@ describe("PublishPanel", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("选择类型与内容类型不一致时阻止发布", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    renderPanel({ postType: "REQUEST" });
+
+    fireEvent.change(screen.getByLabelText("拼图口令"), {
+      target: { value: GIVE_COMMAND },
+    });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "选择的是求助，但内容识别为赠送，请更换内容或发布类型",
+    );
+    expect(screen.getByRole("button", { name: "发布" })).toBeDisabled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("切换类型后保留内容并重新校验", async () => {
+    const view = renderPanel();
+    fireEvent.change(screen.getByLabelText("拼图口令"), {
+      target: { value: GIVE_COMMAND },
+    });
+    expect(await screen.findByText("8折6号·赠送")).toBeInTheDocument();
+
+    view.rerender(
+      <PublishPanel postType="REQUEST" discount={80} pieceNumber={6} />,
+    );
+
+    expect(screen.getByLabelText("拼图口令")).toHaveValue(GIVE_COMMAND);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "选择的是求助，但内容识别为赠送",
+    );
+  });
+
   it("发布失败保留输入并显示中文错误", async () => {
     vi.stubGlobal(
       "fetch",
@@ -123,7 +168,26 @@ describe("PublishPanel", () => {
       expect.objectContaining({ method: "POST" }),
     );
     const body = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string);
-    expect(body.sources).toEqual({ command: GIVE_COMMAND });
+    expect(body).toMatchObject({
+      type: "GIVE",
+      sources: { command: GIVE_COMMAND },
+    });
+  });
+
+  it("求助内容发布时请求体包含显式类型", async () => {
+    const fetchSpy = vi.fn<typeof fetch>();
+    fetchSpy.mockResolvedValue(new Response("{}", { status: 201 }));
+    vi.stubGlobal("fetch", fetchSpy);
+    renderPanel({ postType: "REQUEST", pieceNumber: 1 });
+
+    fireEvent.change(screen.getByLabelText("拼图口令"), {
+      target: { value: REQUEST_COMMAND },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "发布" }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/"));
+    const body = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string);
+    expect(body.type).toBe("REQUEST");
   });
 
   it("身份加载中禁用发布并显示加载提示", () => {
