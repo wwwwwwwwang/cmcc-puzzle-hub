@@ -108,9 +108,8 @@ describe("PublishPanel", () => {
   });
 
   it("发布成功后清空输入并导航大厅", async () => {
-    const fetchSpy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      new Response("{}", { status: 201 }),
-    );
+    const fetchSpy = vi.fn<typeof fetch>();
+    fetchSpy.mockResolvedValue(new Response("{}", { status: 201 }));
     vi.stubGlobal("fetch", fetchSpy);
     renderPanel();
     const input = screen.getByLabelText("拼图口令");

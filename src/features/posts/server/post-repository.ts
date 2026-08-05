@@ -442,11 +442,16 @@ function normalizeStoredPost(value: StoredPost | LegacyStoredPost | null): Store
   const url = value.payloadKind === "URL" ? value.payload : undefined;
   const commandHash = value.payloadKind === "COMMAND" ? value.payloadHash : undefined;
   const urlHash = value.payloadKind === "URL" ? value.payloadHash : undefined;
-  const { payloadKind, payload, payloadHash, ...rest } = value;
 
   return {
-    ...rest,
-    availablePayloadKinds: [payloadKind],
+    id: value.id,
+    type: value.type,
+    discount: value.discount,
+    pieceNumber: value.pieceNumber,
+    availablePayloadKinds: [value.payloadKind],
+    createdAt: value.createdAt,
+    expiresAt: value.expiresAt,
+    publisherDeviceHash: value.publisherDeviceHash,
     payloads: { ...(command ? { command } : {}), ...(url ? { url } : {}) },
     payloadHashes: {
       ...(commandHash ? { command: commandHash } : {}),
