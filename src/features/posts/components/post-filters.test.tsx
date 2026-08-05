@@ -52,4 +52,16 @@ describe("PostFilters", () => {
       scroll: false,
     });
   });
+
+  it("快速连续选择类型和编号时合并尚未提交的 URL 状态", () => {
+    render(<PostFilters discount={80} type={undefined} pieceNumber={null} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "只看赠送" }));
+    fireEvent.click(screen.getByRole("radio", { name: "8折6号拼图" }));
+
+    expect(replace).toHaveBeenLastCalledWith(
+      "/?type=GIVE&pieceNumber=6",
+      { scroll: false },
+    );
+  });
 });

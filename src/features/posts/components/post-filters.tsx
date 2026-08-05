@@ -2,6 +2,7 @@
 
 import { MousePointer2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef } from "react";
 
 import type { Discount, PostType } from "../domain/types";
 import { HallPuzzleBoard } from "./hall-puzzle-board";
@@ -30,12 +31,23 @@ export function PostFilters({ discount, type, pieceNumber }: PostFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const renderedSearch = searchParams.toString();
+  const pendingSearchRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (pendingSearchRef.current === renderedSearch) {
+      pendingSearchRef.current = null;
+    }
+  }, [renderedSearch]);
 
   function navigate(mutator: (params: URLSearchParams) => void) {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(
+      pendingSearchRef.current ?? renderedSearch,
+    );
     mutator(params);
     params.delete("cursor");
     const query = params.toString();
+    pendingSearchRef.current = query;
     router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
   }
 

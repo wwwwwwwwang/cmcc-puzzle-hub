@@ -32,7 +32,11 @@ async function installApiMocks(
   page: Page,
   { post = commandPost, payloads = { command: GIVE_NORMALIZED_COMMAND } }: ApiMockOptions = {},
 ) {
-  const calls = { claim: 0, publishBodies: [] as string[] };
+  const calls = {
+    claim: 0,
+    publishBodies: [] as string[],
+    listUrls: [] as string[],
+  };
 
   await page.route("**/api/posts**", async (route) => {
     const request = route.request();
@@ -45,6 +49,7 @@ async function installApiMocks(
     }
 
     if (request.method() === "GET") {
+      calls.listUrls.push(request.url());
       await route.fulfill({ json: { items: [post], nextCursor: null } });
       return;
     }
@@ -109,10 +114,10 @@ test("仅口令发布和领取保持复制后唤起顺序", async ({ page }) => 
     sources: { command: GIVE_COMMAND },
   });
 
-  await page.getByRole("button", { name: "领取" }).click();
-  await page.getByRole("button", { name: "取消" }).click();
+  await page.getByRole("button", { name: "一键获取" }).click();
+  await page.getByRole("button", { name: "关闭领取弹窗" }).click();
   expect(calls.claim).toBe(0);
-  await page.getByRole("button", { name: "领取" }).click();
+  await page.getByRole("button", { name: "一键获取" }).click();
   await page.getByRole("button", { name: "使用口令领取" }).click();
 
   await expect(page.getByText("若未自动跳转，请手动打开中国移动 APP")).toBeVisible();
@@ -151,7 +156,7 @@ test("仅二维码链接发布和领取不上传图片", async ({ page }) => {
   expect(calls.publishBodies[0]).not.toContain("multipart");
   expect(calls.publishBodies[0]).not.toContain("data:image");
 
-  await page.getByRole("button", { name: "领取" }).click();
+  await page.getByRole("button", { name: "一键获取" }).click();
   await page.getByRole("button", { name: "使用链接领取" }).click();
   await page.waitForURL((url) => url.hostname === "h.app.coc.10086.cn");
   expect(calls.claim).toBe(1);
@@ -179,7 +184,7 @@ test("双来源复制失败后改用链接不会重复领取", async ({ page }) 
     (window as Window & { __clipboardShouldFail?: boolean }).__clipboardShouldFail = true;
   });
 
-  await page.getByRole("button", { name: "领取" }).click();
+  await page.getByRole("button", { name: "一键获取" }).click();
   await expect(page.getByRole("button", { name: "使用口令领取" })).toBeVisible();
   await expect(page.getByRole("button", { name: "使用链接领取" })).toBeVisible();
   await page.getByRole("button", { name: "使用口令领取" }).click();
@@ -192,13 +197,40 @@ test("双来源复制失败后改用链接不会重复领取", async ({ page }) 
   expect(calls.claim).toBe(1);
 });
 
+test("大厅按参考稿筛选折扣、类型和拼图编号", async ({ page }) => {
+  const calls = await installApiMocks(page);
+  await page.goto("/");
+
+  await expect(page.getByRole("button", { name: "8折(9块)" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("radio", { name: "8折6号拼图" })).toBeVisible();
+
+  await page.getByRole("button", { name: "只看赠送" }).click();
+  await page.getByRole("radio", { name: "8折6号拼图" }).click();
+
+  await expect(page).toHaveURL(/type=GIVE/);
+  await expect(page).toHaveURL(/pieceNumber=6/);
+  await expect
+    .poll(() => calls.listUrls.at(-1) ?? "")
+    .toContain("pieceNumber=6");
+
+  await page.getByRole("button", { name: "95折(4块)" }).click();
+  await expect(page).not.toHaveURL(/pieceNumber=/);
+  await expect(page.getByRole("radio")).toHaveCount(4);
+});
+
 test("大厅、领取抽屉和发布页无横向溢出", async ({ page }) => {
   await installApiMocks(page, { post: dualPost });
   await page.goto("/");
+  await expect(page.getByText("最新发布")).toBeVisible();
+  await expect(page.getByRole("button", { name: "刷新" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "一键获取" })).toBeVisible();
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
     .toBe(true);
-  await page.getByRole("button", { name: "领取" }).click();
+  await page.getByRole("button", { name: "一键获取" }).click();
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
     .toBe(true);
