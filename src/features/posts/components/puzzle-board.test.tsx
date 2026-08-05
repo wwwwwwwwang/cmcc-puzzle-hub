@@ -55,6 +55,25 @@ describe("PuzzleBoard", () => {
     );
   });
 
+  it("禁用时鼠标和键盘都不能选择拼图", () => {
+    const onChange = vi.fn();
+    render(
+      <PuzzleBoard
+        discount={80}
+        value={null}
+        onChange={onChange}
+        disabled
+      />,
+    );
+
+    const first = screen.getByRole("radio", { name: "8折1号拼图" });
+    expect(first).toBeDisabled();
+    expect(first).toHaveAttribute("tabindex", "-1");
+    fireEvent.click(first);
+    fireEvent.keyDown(first, { key: "ArrowRight" });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("单选 6 号并使用科技蓝选中态", () => {
     render(<Harness />);
     const sixth = screen.getByRole("radio", { name: "8折6号拼图" });

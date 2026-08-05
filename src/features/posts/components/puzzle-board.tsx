@@ -21,9 +21,15 @@ type PuzzleBoardProps = {
   discount: Discount;
   value: number | null;
   onChange: (pieceNumber: number | null) => void;
+  disabled?: boolean;
 };
 
-export function PuzzleBoard({ discount, value, onChange }: PuzzleBoardProps) {
+export function PuzzleBoard({
+  discount,
+  value,
+  onChange,
+  disabled = false,
+}: PuzzleBoardProps) {
   const reduceMotion = useReducedMotion();
   const count = pieceCountByDiscount[discount];
   const columns = discount === 95 ? 2 : 3;
@@ -43,6 +49,8 @@ export function PuzzleBoard({ discount, value, onChange }: PuzzleBoardProps) {
   }
 
   function handleKeyDown(key: string, pieceNumber: number) {
+    if (disabled) return false;
+
     switch (key) {
       case "ArrowRight":
       case "ArrowDown":
@@ -67,6 +75,7 @@ export function PuzzleBoard({ discount, value, onChange }: PuzzleBoardProps) {
     <div
       role="radiogroup"
       aria-label={`${discountLabel[discount]}拼图选择`}
+      aria-disabled={disabled}
       className="grid gap-3"
       style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
     >
@@ -84,8 +93,17 @@ export function PuzzleBoard({ discount, value, onChange }: PuzzleBoardProps) {
             role="radio"
             aria-checked={selected}
             aria-label={`${discountLabel[discount]}${pieceNumber}号拼图`}
-            tabIndex={selected || (value === null && pieceNumber === 1) ? 0 : -1}
-            onClick={() => onChange(pieceNumber)}
+            disabled={disabled}
+            tabIndex={
+              disabled
+                ? -1
+                : selected || (value === null && pieceNumber === 1)
+                  ? 0
+                  : -1
+            }
+            onClick={() => {
+              if (!disabled) onChange(pieceNumber);
+            }}
             onKeyDown={(event) => {
               if (handleKeyDown(event.key, pieceNumber)) event.preventDefault();
             }}
@@ -96,7 +114,7 @@ export function PuzzleBoard({ discount, value, onChange }: PuzzleBoardProps) {
             }
             whileTap={reduceMotion ? undefined : { scale: 0.97 }}
             transition={reduceMotion ? undefined : { duration: 0.16 }}
-            className={`aspect-square rounded-2xl border text-sm font-semibold shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+            className={`aspect-square rounded-2xl border text-sm font-semibold shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-slate-100 disabled:bg-slate-50 disabled:text-slate-300 disabled:shadow-none ${
               selected
                 ? "border-blue-500 bg-blue-600 text-white shadow-blue-200"
                 : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50"
