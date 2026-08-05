@@ -202,21 +202,31 @@ describe("/api/posts", () => {
       nextCursor: "cursor-value",
     });
     const response = await GET(
-      new Request("http://localhost/api/posts?type=GIVE&discount=80&limit=20"),
+      new Request(
+        "http://localhost/api/posts?type=GIVE&discount=80&pieceNumber=6&limit=20",
+      ),
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       items: expect.any(Array),
       nextCursor: "cursor-value",
     });
-    expect(listPosts).toHaveBeenCalledWith(
-      { type: "GIVE", discount: 80, limit: 20 },
-    );
+    expect(listPosts).toHaveBeenCalledWith({
+      type: "GIVE",
+      discount: 80,
+      pieceNumber: 6,
+      limit: 20,
+    });
   });
 
   it.each([
     "type=OTHER",
     "discount=70",
+    "pieceNumber=0",
+    "pieceNumber=1.5",
+    "pieceNumber=05",
+    "discount=95&pieceNumber=5",
+    "pieceNumber=1&pieceNumber=2",
     "limit=21",
     "limit=0",
     "cursor=abc",

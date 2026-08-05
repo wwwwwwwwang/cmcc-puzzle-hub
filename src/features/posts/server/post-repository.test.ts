@@ -245,6 +245,31 @@ describe("listPosts", () => {
     ).toBe(true);
   });
 
+  it("跨批次扫描直到收集到编号匹配的帖子", async () => {
+    const posts = Array.from({ length: 41 }, (_, index) => ({
+      ...basePost,
+      id: `p_1800086400000_123e4567-e89b-42d3-a456-${String(index).padStart(12, "0")}`,
+      pieceNumber: index === 40 ? 2 : 1,
+    } satisfies StoredPost));
+
+    const redis = createRedis({
+      zrange: vi.fn(async (_key, _max, _min, options) =>
+        posts
+          .slice(options.offset, options.offset + options.count)
+          .flatMap((post, index) => [post.id, 100 - options.offset - index]),
+      ),
+      mget: vi.fn(async (...keys: string[]) =>
+        keys.map((key) => posts.find((post) => key.endsWith(post.id)) ?? null),
+      ),
+    });
+
+    const page = await listPosts({ pieceNumber: 2, limit: 20 }, { redis });
+
+    expect(page.items.map(({ id }) => id)).toEqual([posts[40].id]);
+    expect(redis.zrange).toHaveBeenCalledTimes(2);
+    expect(page.nextCursor).toBeNull();
+  });
+
   it("先裁剪过期索引并将孤立清理限制为每批 40 个", async () => {
     const ids = Array.from({ length: 81 }, (_, index) =>
       `p_1800086400000_123e4567-e89b-42d3-a456-${String(index).padStart(12, "0")}`,

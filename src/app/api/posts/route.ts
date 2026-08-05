@@ -98,7 +98,13 @@ export async function POST(request: Request) {
 }
 
 function parseListQuery(searchParams: URLSearchParams) {
-  const allowedKeys = new Set(["type", "discount", "cursor", "limit"]);
+  const allowedKeys = new Set([
+    "type",
+    "discount",
+    "pieceNumber",
+    "cursor",
+    "limit",
+  ]);
   for (const key of searchParams.keys()) {
     if (!allowedKeys.has(key) || searchParams.getAll(key).length !== 1) {
       return { success: false as const, field: key };
@@ -107,9 +113,11 @@ function parseListQuery(searchParams: URLSearchParams) {
 
   const type = searchParams.get("type") || undefined;
   const discountValue = searchParams.get("discount");
+  const pieceNumberValue = searchParams.get("pieceNumber");
   const limitValue = searchParams.get("limit");
   const cursor = searchParams.get("cursor") || undefined;
   const discount = discountValue ? Number(discountValue) : undefined;
+  const pieceNumber = pieceNumberValue ? Number(pieceNumberValue) : undefined;
   const limit = limitValue ? Number(limitValue) : undefined;
 
   if (type !== undefined && type !== "GIVE" && type !== "REQUEST") {
@@ -117,6 +125,17 @@ function parseListQuery(searchParams: URLSearchParams) {
   }
   if (discount !== undefined && ![95, 90, 80].includes(discount)) {
     return { success: false as const, field: "discount" };
+  }
+  if (
+    pieceNumberValue !== null &&
+    !/^[1-9]\d*$/.test(pieceNumberValue)
+  ) {
+    return { success: false as const, field: "pieceNumber" };
+  }
+  const maxPieceNumber =
+    discount === 95 ? 4 : discount === 90 ? 6 : discount === 80 ? 9 : 9;
+  if (pieceNumber !== undefined && pieceNumber > maxPieceNumber) {
+    return { success: false as const, field: "pieceNumber" };
   }
   if (
     limit !== undefined &&
@@ -136,6 +155,7 @@ function parseListQuery(searchParams: URLSearchParams) {
     filters: {
       ...(type ? { type: type as "GIVE" | "REQUEST" } : {}),
       ...(discount ? { discount: discount as 95 | 90 | 80 } : {}),
+      ...(pieceNumber ? { pieceNumber } : {}),
       ...(cursor ? { cursor } : {}),
       ...(limit ? { limit } : {}),
     },

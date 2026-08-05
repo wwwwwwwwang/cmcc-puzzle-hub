@@ -91,6 +91,7 @@ type PublishPostResult =
 export type ListPostFilters = {
   type?: PostType;
   discount?: Discount;
+  pieceNumber?: number;
   cursor?: string;
   limit?: number;
 };
@@ -212,6 +213,12 @@ export async function listPosts(
       const storedPost = normalizeStoredPost(values[index]);
       if (!storedPost) {
         orphanIds.push(entry.id);
+        return;
+      }
+      if (
+        filters.pieceNumber !== undefined &&
+        storedPost.pieceNumber !== filters.pieceNumber
+      ) {
         return;
       }
       posts.set(entry.id, storedPost);
