@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { Copy, ExternalLink, Smartphone, X } from "lucide-react";
 
@@ -12,7 +13,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { useDeviceIdentity } from "@/features/posts/device/device-provider";
+import { useAuthSession } from "@/features/auth/auth-session";
 import { parseUrl } from "@/features/posts/domain/parse-url";
 import type {
   HallPostDto,
@@ -36,6 +37,8 @@ type ClaimSuccess = {
 
 const errorMessages: Record<string, string> = {
   EXPIRED: "这条内容已过期",
+  INSUFFICIENT_CREDITS: "信用点不足，发布赠送被领取可获得信用",
+  RATE_LIMITED: "操作过于频繁，请稍后再试",
   SERVICE_UNAVAILABLE: "服务暂时不可用，请稍后重试",
 };
 
@@ -47,7 +50,8 @@ export function ClaimDrawer({
   launchApp = defaultLaunchApp,
   navigate = defaultNavigate,
 }: ClaimDrawerProps) {
-  const identity = useDeviceIdentity();
+  const router = useRouter();
+  const { isAuthenticated } = useAuthSession();
   const [submitting, setSubmitting] = useState(false);
   const [pendingMethod, setPendingMethod] = useState<PayloadKind | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -98,11 +102,12 @@ export function ClaimDrawer({
       return;
     }
 
-    if (
-      identity.status !== "ready" ||
-      identity.visitorId === null ||
-      submittingRef.current
-    ) {
+    if (!isAuthenticated) {
+      router.push(`/login?redirect=/`);
+      return;
+    }
+
+    if (submittingRef.current) {
       return;
     }
 
@@ -115,8 +120,12 @@ export function ClaimDrawer({
       const response = await fetch(`/api/posts/${post.id}/claim`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ visitorId: identity.visitorId }),
       });
+
+      if (response.status === 401) {
+        router.push(`/login?redirect=/`);
+        return;
+      }
 
       if (!response.ok) {
         const code = await readErrorCode(response);
@@ -151,7 +160,6 @@ export function ClaimDrawer({
     }
   }
 
-  const identityReady = identity.status === "ready" && identity.visitorId !== null;
   const hasCommand = post.availablePayloadKinds.includes("COMMAND");
   const hasUrl = post.availablePayloadKinds.includes("URL");
 
@@ -185,16 +193,10 @@ export function ClaimDrawer({
               ? `请选择更适合你的${actionNoun}方式。`
               : `确认后将${actionNoun}并打开对应内容。`}
           </p>
-          {identity.status === "loading" ? (
-            <p className="text-sm text-slate-500">正在准备设备身份…</p>
-          ) : null}
-          {identity.status === "error" ? (
-            <div className="flex items-center justify-between gap-3 text-sm text-red-600">
-              <span>设备身份加载失败</span>
-              <Button type="button" size="sm" variant="outline" onClick={identity.retry}>
-                重试身份
-              </Button>
-            </div>
+          {!isAuthenticated ? (
+            <p className="text-sm text-slate-500">
+              {actionNoun}需要先登录,点击下方按钮将前往登录页。
+            </p>
           ) : null}
           {error ? (
             <div className="space-y-2">
@@ -232,7 +234,7 @@ export function ClaimDrawer({
                 <Button
                   type="button"
                   className="h-12 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
-                  disabled={!identityReady || submitting}
+                  disabled={submitting}
                   onClick={() => void handleClaim("URL")}
                 >
                   <ExternalLink data-icon="inline-start" />
@@ -250,7 +252,7 @@ export function ClaimDrawer({
                       : "bg-blue-600 text-white hover:bg-blue-700"
                   }`}
                   variant={hasUrl ? "secondary" : "default"}
-                  disabled={!identityReady || submitting}
+                  disabled={submitting}
                   onClick={() => void handleClaim("COMMAND")}
                 >
                   <Copy data-icon="inline-start" />

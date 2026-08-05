@@ -6,17 +6,15 @@ import {
 } from "../../../../tests/fixtures/cmcc-samples";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/features/posts/device/hash", () => ({
-  hashVisitorId: vi.fn(() => "0123456789abcdef".repeat(4)),
-}));
-
 vi.mock("server-only", () => ({}));
 
-const { publishPost, listPosts, checkPublishRateLimit } = vi.hoisted(() => ({
-  publishPost: vi.fn(),
-  listPosts: vi.fn(),
-  checkPublishRateLimit: vi.fn(),
-}));
+const { publishPost, listPosts, checkPublishRateLimit, getApprovedUser } =
+  vi.hoisted(() => ({
+    publishPost: vi.fn(),
+    listPosts: vi.fn(),
+    checkPublishRateLimit: vi.fn(),
+    getApprovedUser: vi.fn(),
+  }));
 
 vi.mock("@/features/posts/server/post-repository", () => ({
   publishPost,
@@ -25,6 +23,10 @@ vi.mock("@/features/posts/server/post-repository", () => ({
 vi.mock("@/features/posts/server/rate-limit", () => ({
   checkPublishRateLimit,
 }));
+vi.mock("@/lib/supabase/server", () => ({ getApprovedUser }));
+
+const USER_ID = "11111111-1111-4111-8111-111111111111";
+const POST_ID = "123e4567-e89b-42d3-a456-426614174000";
 
 import { GET, POST } from "./route";
 
@@ -46,22 +48,31 @@ const baseInput = {
 describe("/api/posts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getApprovedUser.mockResolvedValue({ id: USER_ID });
     checkPublishRateLimit.mockResolvedValue({ success: true, reset: Date.now() + 1000 });
     publishPost.mockResolvedValue({
       status: "CREATED",
       post: {
-        id: "p_1800086400000_123e4567-e89b-42d3-a456-426614174000",
+        id: POST_ID,
         type: "GIVE",
         discount: 80,
         pieceNumber: 6,
         availablePayloadKinds: ["COMMAND"],
-        payloads: { command: "￥19uSvG￥" },
-        publisherDeviceHash: "0123456789abcdef".repeat(4),
-        payloadHashes: { command: "payload-hash" },
+        publisherId: "U-0123456789ABCDEF",
         createdAt: "2027-01-15T08:00:00.000Z",
         expiresAt: "2027-01-16T08:00:00.000Z",
       },
     });
+  });
+
+  it("未登录发布返回 401/UNAUTHENTICATED", async () => {
+    getApprovedUser.mockResolvedValue(null);
+    const response = await POST(request(baseInput));
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "UNAUTHENTICATED" },
+    });
+    expect(publishPost).not.toHaveBeenCalled();
   });
 
   it("异常日志仅记录错误码与 requestId", async () => {
@@ -118,9 +129,8 @@ describe("/api/posts", () => {
       post: { publisherId: "U-0123456789ABCDEF" },
     });
     const published = publishPost.mock.calls[0][0];
-    expect(published).toMatchObject({ type, payloads });
-    expect(Object.values(published.payloadHashes)[0]).toMatch(/^[0-9a-f]{64}$/);
-    expect(published.publisherDeviceHash).toBe("0123456789abcdef".repeat(4));
+    expect(published).toMatchObject({ type, payloads, publisherId: USER_ID });
+    expect(published.payloadHashes[0]).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("口令拼图与选择不一致返回 400/SELECTION_MISMATCH", async () => {
@@ -209,7 +219,7 @@ describe("/api/posts", () => {
     listPosts.mockResolvedValue({
       items: [
         {
-          id: "p_1800086400000_123e4567-e89b-42d3-a456-426614174000",
+          id: POST_ID,
           type: "GIVE",
           discount: 80,
           pieceNumber: 9,
@@ -250,7 +260,7 @@ describe("/api/posts", () => {
     "limit=21",
     "limit=0",
     "cursor=abc",
-    `cursor=${Buffer.from(JSON.stringify({ score: "bad", id: "" })).toString("base64url")}`,
+    `cursor=${Buffer.from(JSON.stringify({ createdAt: "bad", id: "" })).toString("base64url")}`,
     "unknown=value",
   ])("GET 非法参数 %s 返回 400", async (query) => {
     const response = await GET(new Request(`http://localhost/api/posts?${query}`));
@@ -265,8 +275,8 @@ describe("/api/posts", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const cursor = Buffer.from(
       JSON.stringify({
-        score: 100,
-        id: "p_1800000000000_123e4567-e89b-42d3-a456-426614174000",
+        createdAt: "2027-01-15T08:00:00.000Z",
+        id: POST_ID,
       }),
     ).toString("base64url");
     listPosts.mockRejectedValue(new Error(`redis cursor=${cursor} token-secret`));

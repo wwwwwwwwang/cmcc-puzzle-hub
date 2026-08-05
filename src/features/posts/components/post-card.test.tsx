@@ -4,18 +4,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HallPostDto } from "@/features/posts/domain/types";
 import { PostCard } from "./post-card";
 
-const { identity } = vi.hoisted(() => ({
-  identity: {
-    status: "ready",
-    visitorId: "visitor-id-123",
-    publicId: "U-0123456789ABCDEF",
-    publicIdStatus: "ready",
-    retry: vi.fn(),
-  },
+const { authSession } = vi.hoisted(() => ({
+  authSession: { isAuthenticated: true, publicId: "U-0123456789ABCDEF" },
 }));
 
-vi.mock("@/features/posts/device/device-provider", () => ({
-  useDeviceIdentity: () => identity,
+vi.mock("@/features/auth/auth-session", () => ({
+  useAuthSession: () => authSession,
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 const post: HallPostDto = {

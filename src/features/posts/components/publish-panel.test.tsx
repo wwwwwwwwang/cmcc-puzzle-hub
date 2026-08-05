@@ -7,23 +7,16 @@ import {
   REQUEST_COMMAND,
 } from "../../../../tests/fixtures/cmcc-samples";
 import { PublishPanel } from "./publish-panel";
-import type { DeviceIdentity } from "@/features/posts/device/device-provider";
 
 const push = vi.fn();
-const identity: DeviceIdentity = {
-  status: "ready",
-  visitorId: "visitor-id-123",
-  publicId: "U-0123456789ABCDEF",
-  publicIdStatus: "ready",
-  retry: vi.fn(),
-};
+const authSession = { isAuthenticated: true, publicId: "U-0123456789ABCDEF" };
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
 }));
 
-vi.mock("@/features/posts/device/device-provider", () => ({
-  useDeviceIdentity: () => identity,
+vi.mock("@/features/auth/auth-session", () => ({
+  useAuthSession: () => authSession,
 }));
 
 function renderPanel(overrides: Partial<React.ComponentProps<typeof PublishPanel>> = {}) {
@@ -42,8 +35,7 @@ describe("PublishPanel", () => {
     cleanup();
     push.mockReset();
     vi.unstubAllGlobals();
-    identity.status = "ready";
-    identity.visitorId = "visitor-id-123";
+    authSession.isAuthenticated = true;
   });
 
   it("无拼图选择时禁用口令输入和图片按钮", () => {
@@ -192,11 +184,14 @@ describe("PublishPanel", () => {
     expect(body.type).toBe("REQUEST");
   });
 
-  it("身份加载中禁用发布并显示加载提示", () => {
-    identity.status = "loading";
-    identity.visitorId = null;
+  it("未登录时隐藏发布按钮并显示去登录入口", () => {
+    authSession.isAuthenticated = false;
     renderPanel();
 
-    expect(screen.getByRole("button", { name: "正在准备身份…" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "发布" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "去登录 / 注册" })).toHaveAttribute(
+      "href",
+      "/login?redirect=/publish",
+    );
   });
 });

@@ -26,17 +26,10 @@ const sourcesSchema = z
     message: "至少提供一种拼图来源",
   });
 
-const visitorIdSchema = z.string().trim().min(8).max(256);
-
 export const createPostInputSchema = z.object({
   type: z.enum(["GIVE", "REQUEST"]),
   selection: selectionSchema,
   sources: sourcesSchema,
-  visitorId: visitorIdSchema,
-});
-
-export const claimPostInputSchema = z.object({
-  visitorId: visitorIdSchema,
 });
 
 export type CreatePostInput = z.infer<typeof createPostInputSchema>;

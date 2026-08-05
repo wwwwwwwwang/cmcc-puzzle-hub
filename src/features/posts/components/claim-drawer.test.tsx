@@ -1,23 +1,21 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { DeviceIdentity } from "@/features/posts/device/device-provider";
 import type { HallPostDto } from "@/features/posts/domain/types";
 import { ClaimDrawer } from "./claim-drawer";
 
 const GIVE_URL =
   "https://h.app.coc.10086.cn/activity/zx/transit/transferDownload.html?targetUrl=https%3A%2F%2Fwx.10086.cn%2Fhlwyxhdhub%2Fact-wedrecharge%2F1024101716%3FgiveCard%3Dabc";
 
-const identity: DeviceIdentity = {
-  status: "ready",
-  visitorId: "visitor-id-123",
-  publicId: "U-0123456789ABCDEF",
-  publicIdStatus: "ready",
-  retry: vi.fn(),
-};
+const push = vi.fn();
+const authSession = { isAuthenticated: true, publicId: "U-0123456789ABCDEF" };
 
-vi.mock("@/features/posts/device/device-provider", () => ({
-  useDeviceIdentity: () => identity,
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push }),
+}));
+
+vi.mock("@/features/auth/auth-session", () => ({
+  useAuthSession: () => authSession,
 }));
 
 const commandPost: HallPostDto = {
@@ -71,8 +69,8 @@ describe("ClaimDrawer", () => {
     cleanup();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    identity.status = "ready";
-    identity.visitorId = "visitor-id-123";
+    push.mockReset();
+    authSession.isAuthenticated = true;
   });
 
   it("双来源帖子同时显示口令和链接领取动作", () => {
@@ -153,6 +151,17 @@ describe("ClaimDrawer", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it("未登录点击领取跳转登录页,不请求 API", () => {
+    authSession.isAuthenticated = false;
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    renderDrawer();
+
+    fireEvent.click(screen.getByRole("button", { name: "使用口令领取" }));
+    expect(push).toHaveBeenCalledWith("/login?redirect=/");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("选择口令后才请求 API，复制成功后移除卡片并唤起 APP", async () => {
     const fetchSpy = vi.fn(async () => claimResponse({ command: "￥19uSvG￥" }));
     vi.stubGlobal("fetch", fetchSpy);
@@ -165,10 +174,7 @@ describe("ClaimDrawer", () => {
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
     expect(fetchSpy).toHaveBeenCalledWith(
       `/api/posts/${commandPost.id}/claim`,
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ visitorId: "visitor-id-123" }),
-      }),
+      expect.objectContaining({ method: "POST" }),
     );
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("￥19uSvG￥"));
     expect(onClaimed).toHaveBeenCalledWith(commandPost.id);

@@ -5,6 +5,11 @@ vi.mock("next/font/google", () => ({
   Geist_Mono: () => ({ variable: "--font-geist-mono" }),
 }));
 
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/supabase/server", () => ({
+  getAuthSession: vi.fn(async () => ({ isAuthenticated: false, publicId: null })),
+}));
+
 import { metadata } from "./layout";
 
 describe("site metadata", () => {

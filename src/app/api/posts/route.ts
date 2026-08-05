@@ -1,7 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { hashVisitorId } from "@/features/posts/device/hash";
-import { toPublicDeviceId } from "@/features/posts/device/public-id";
 import { DomainError } from "@/features/posts/domain/errors";
 import {
   assertPostTypeMatches,
@@ -11,13 +9,12 @@ import {
   createPostInputSchema,
   type CreatePostInput,
 } from "@/features/posts/domain/schemas";
-import type { HallPostDto, StoredPost } from "@/features/posts/domain/types";
 import {
   listPosts,
   publishPost,
 } from "@/features/posts/server/post-repository";
 import { checkPublishRateLimit } from "@/features/posts/server/rate-limit";
-import { parsePostId } from "@/features/posts/server/keys";
+import { getApprovedUser } from "@/lib/supabase/server";
 
 const POST_TTL_MS = 86_400_000;
 
@@ -36,6 +33,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const user = await getApprovedUser();
+  if (!user) return jsonError("UNAUTHENTICATED", 401);
+
   let input: CreatePostInput;
   try {
     input = createPostInputSchema.parse(await request.json());
@@ -44,8 +44,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const deviceHash = hashVisitorId(input.visitorId);
-    const rate = await checkPublishRateLimit(deviceHash);
+    const rate = await checkPublishRateLimit(user.id);
     if (!rate.success) {
       const retryAfter = Math.max(1, Math.ceil((rate.reset - Date.now()) / 1000));
       return jsonError("RATE_LIMITED", 429, undefined, {
@@ -55,25 +54,15 @@ export async function POST(request: Request) {
 
     const parsedSources = parseSources(input.sources, input.selection);
     assertPostTypeMatches(parsedSources.type, input.type);
-    const payloadHashes = {
+    const payloadHashes = [
       ...(parsedSources.sources.command
-        ? {
-            command: createHash("sha256")
-              .update(parsedSources.sources.command)
-              .digest("hex"),
-          }
-        : {}),
-      ...(parsedSources.sources.url
-        ? {
-            url: createHash("sha256")
-              .update(parsedSources.sources.url)
-              .digest("hex"),
-          }
-        : {}),
-    };
-    const createdAt = new Date();
-    const expiresAt = new Date(createdAt.getTime() + POST_TTL_MS);
+        ? [sha256(parsedSources.sources.command)]
+        : []),
+      ...(parsedSources.sources.url ? [sha256(parsedSources.sources.url)] : []),
+    ];
+    const expiresAt = new Date(Date.now() + POST_TTL_MS);
     const result = await publishPost({
+      publisherId: user.id,
       type: parsedSources.type,
       discount: input.selection.discount,
       pieceNumber: input.selection.pieceNumber,
@@ -82,9 +71,7 @@ export async function POST(request: Request) {
         ...(parsedSources.sources.url ? (["URL"] as const) : []),
       ],
       payloads: parsedSources.sources,
-      publisherDeviceHash: deviceHash,
       payloadHashes,
-      createdAt: createdAt.toISOString(),
       expiresAt: expiresAt.toISOString(),
     });
 
@@ -92,7 +79,10 @@ export async function POST(request: Request) {
       return jsonError("DUPLICATE_POST", 409);
     }
 
-    return Response.json({ post: toHallPostDto(result.post) }, { status: 201 });
+    return Response.json(
+      { post: result.post },
+      { status: 201, headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     if (error instanceof DomainError) {
       return jsonError(error.code, 400);
@@ -100,6 +90,10 @@ export async function POST(request: Request) {
     logRouteError("SERVICE_UNAVAILABLE");
     return jsonError("SERVICE_UNAVAILABLE", 503);
   }
+}
+
+function sha256(value: string) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function parseListQuery(searchParams: URLSearchParams) {
@@ -167,17 +161,19 @@ function parseListQuery(searchParams: URLSearchParams) {
   };
 }
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function isValidCursor(value: string) {
   try {
     const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
     return (
       typeof parsed === "object" &&
       parsed !== null &&
-      typeof parsed.score === "number" &&
-      Number.isFinite(parsed.score) &&
+      typeof parsed.createdAt === "string" &&
+      Number.isFinite(Date.parse(parsed.createdAt)) &&
       typeof parsed.id === "string" &&
-      parsed.id.length > 0 &&
-      Boolean(parsePostId(parsed.id))
+      UUID_PATTERN.test(parsed.id)
     );
   } catch {
     return false;
@@ -186,19 +182,6 @@ function isValidCursor(value: string) {
 
 function logRouteError(code: string) {
   console.error(JSON.stringify({ code, requestId: randomUUID() }));
-}
-
-function toHallPostDto(post: StoredPost): HallPostDto {
-  return {
-    id: post.id,
-    type: post.type,
-    publisherId: toPublicDeviceId(post.publisherDeviceHash),
-    discount: post.discount,
-    pieceNumber: post.pieceNumber,
-    availablePayloadKinds: post.availablePayloadKinds,
-    createdAt: post.createdAt,
-    expiresAt: post.expiresAt,
-  };
 }
 
 function jsonError(

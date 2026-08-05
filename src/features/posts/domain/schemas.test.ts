@@ -5,7 +5,6 @@ import { createPostInputSchema } from "./schemas";
 const baseInput = {
   type: "GIVE" as const,
   sources: { command: "￥19uSvG￥" },
-  visitorId: "device-visitor-id",
 };
 
 describe("createPostInputSchema", () => {

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { useDeviceIdentity } from "@/features/posts/device/device-provider";
+import { useAuthSession } from "@/features/auth/auth-session";
 import type { HallPostDto } from "@/features/posts/domain/types";
 import { ClaimDrawer } from "./claim-drawer";
 import { formatRelativeTime } from "./relative-time";
@@ -14,7 +14,7 @@ type PostCardProps = {
 };
 
 export function PostCard({ post, onRemoved }: PostCardProps) {
-  const identity = useDeviceIdentity();
+  const { publicId } = useAuthSession();
   const [open, setOpen] = useState(false);
   const claimedRef = useRef(false);
 
@@ -24,8 +24,7 @@ export function PostCard({ post, onRemoved }: PostCardProps) {
       : post.availablePayloadKinds[0] === "COMMAND"
         ? "仅有口令"
         : "仅有链接";
-  const isOwnPost =
-    identity.publicIdStatus === "ready" && identity.publicId === post.publisherId;
+  const isOwnPost = publicId !== null && publicId === post.publisherId;
   const metaLabel = `发布者 ${post.publisherId}${isOwnPost ? "（我）" : ""} · ${sourceLabel} · ${formatRelativeTime(post.createdAt)}`;
 
   function handleOpenChange(nextOpen: boolean) {

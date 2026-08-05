@@ -24,10 +24,10 @@ describe("AppShell", () => {
     );
   });
 
-  it("底栏只包含大厅和发布并标记活动项", () => {
+  it("底栏包含大厅、发布和我的并标记活动项", () => {
     render(<AppShell>content</AppShell>);
     const links = screen.getAllByRole("link");
-    expect(links.map((link) => link.textContent)).toEqual(["大厅", "发布"]);
+    expect(links.map((link) => link.textContent)).toEqual(["大厅", "发布", "我的"]);
     expect(screen.getByRole("link", { name: "发布" })).toHaveAttribute(
       "aria-current",
       "page",

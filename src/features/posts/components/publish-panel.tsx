@@ -4,10 +4,12 @@ import { CheckCircle2, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, type FormEvent } from "react";
 
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { useDeviceIdentity } from "@/features/posts/device/device-provider";
+import { useAuthSession } from "@/features/auth/auth-session";
 import { DomainError } from "@/features/posts/domain/errors";
 import {
   assertPostTypeMatches,
@@ -44,7 +46,7 @@ export function PublishPanel({
   decodeImage,
 }: PublishPanelProps) {
   const router = useRouter();
-  const identity = useDeviceIdentity();
+  const { isAuthenticated } = useAuthSession();
   const [command, setCommand] = useState("");
   const [qrUrl, setQrUrl] = useState("");
   const [activeSource, setActiveSource] = useState<"COMMAND" | "URL">("COMMAND");
@@ -78,12 +80,7 @@ export function PublishPanel({
     }
   }, [postType, selection, sources]);
   const canSubmit = Boolean(
-    postType &&
-      selection &&
-      preview.parsed &&
-      identity.status === "ready" &&
-      identity.visitorId &&
-      !submitting,
+    postType && selection && preview.parsed && isAuthenticated && !submitting,
   );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -92,8 +89,7 @@ export function PublishPanel({
       !postType ||
       !selection ||
       !preview.parsed ||
-      identity.status !== "ready" ||
-      !identity.visitorId ||
+      !isAuthenticated ||
       submittingRef.current
     ) {
       return;
@@ -106,7 +102,6 @@ export function PublishPanel({
       type: postType,
       selection,
       sources: { command: command.trim() || undefined, url: qrUrl.trim() || undefined },
-      visitorId: identity.visitorId,
     };
 
     try {
@@ -115,6 +110,10 @@ export function PublishPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       });
+      if (response.status === 401) {
+        router.push("/login?redirect=/publish");
+        return;
+      }
       if (!response.ok) {
         const code = await readErrorCode(response);
         setSubmitError(apiErrorMessage[code] ?? "发布失败，请稍后重试");
@@ -207,15 +206,21 @@ export function PublishPanel({
       ) : null}
       {preview.error ? <p role="alert" className="text-sm text-red-600">{preview.error}</p> : null}
       {submitError ? <p role="alert" className="text-sm text-red-600">{submitError}</p> : null}
-      {identity.status === "error" ? (
-        <div className="flex items-center justify-between gap-3 text-sm text-red-600">
-          <span>设备身份加载失败</span>
-          <Button type="button" variant="outline" size="sm" onClick={identity.retry}>重试</Button>
+      {!isAuthenticated ? (
+        <div className="space-y-2 rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-600">
+          <p>发布拼图需要先登录账号。</p>
+          <Link
+            href="/login?redirect=/publish"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            去登录 / 注册
+          </Link>
         </div>
-      ) : null}
-      <Button type="submit" className="h-11 w-full" disabled={!canSubmit}>
-        {identity.status === "loading" ? "正在准备身份…" : submitting ? "正在发布…" : "发布"}
-      </Button>
+      ) : (
+        <Button type="submit" className="h-11 w-full" disabled={!canSubmit}>
+          {submitting ? "正在发布…" : "发布"}
+        </Button>
+      )}
     </form>
   );
 }

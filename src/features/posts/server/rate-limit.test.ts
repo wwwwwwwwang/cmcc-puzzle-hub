@@ -20,20 +20,21 @@ vi.mock("@upstash/ratelimit", () => ({
 }));
 
 import {
+  checkClaimRateLimit,
   checkPublishRateLimit,
+  createDailyClaimRateLimiter,
+  createDailyPublishRateLimiter,
   createPublishRateLimiter,
 } from "./rate-limit";
 
-describe("publish rate limit", () => {
+describe("rate limit 构造", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("使用每小时滑动窗口和发布命名空间", () => {
+  it("每小时发布限流用 1h 窗口与 rate:publish 前缀", () => {
     const redis = {};
-
     createPublishRateLimiter(redis as never, 7);
-
     expect(slidingWindowSpy).toHaveBeenCalledWith(7, "1 h");
     expect(constructorSpy).toHaveBeenCalledWith({
       redis,
@@ -42,13 +43,60 @@ describe("publish rate limit", () => {
     });
   });
 
-  it("只把 deviceHash 作为 identifier 并返回 success/reset", async () => {
-    limitSpy.mockResolvedValue({ success: false, reset: 1234, remaining: 0 });
-    const limiter = { limit: limitSpy };
+  it("每日发布限流用 1d 窗口与 rate:publish:day 前缀", () => {
+    const redis = {};
+    createDailyPublishRateLimiter(redis as never, 10);
+    expect(slidingWindowSpy).toHaveBeenCalledWith(10, "1 d");
+    expect(constructorSpy).toHaveBeenCalledWith({
+      redis,
+      limiter: "sliding-window",
+      prefix: "rate:publish:day",
+    });
+  });
 
+  it("每日领取限流用 1d 窗口与 rate:claim:day 前缀", () => {
+    const redis = {};
+    createDailyClaimRateLimiter(redis as never, 10);
+    expect(slidingWindowSpy).toHaveBeenCalledWith(10, "1 d");
+    expect(constructorSpy).toHaveBeenCalledWith({
+      redis,
+      limiter: "sliding-window",
+      prefix: "rate:claim:day",
+    });
+  });
+});
+
+describe("checkPublishRateLimit", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("小时或每日任一超限即失败,reset 取较大值", async () => {
+    const hourly = { limit: vi.fn(async () => ({ success: true, reset: 100 })) };
+    const daily = { limit: vi.fn(async () => ({ success: false, reset: 500 })) };
     await expect(
-      checkPublishRateLimit("device-hash", limiter),
-    ).resolves.toEqual({ success: false, reset: 1234 });
-    expect(limitSpy).toHaveBeenCalledWith("device-hash");
+      checkPublishRateLimit("user-1", {
+        hourly: hourly as never,
+        daily: daily as never,
+      }),
+    ).resolves.toEqual({ success: false, reset: 500 });
+    expect(hourly.limit).toHaveBeenCalledWith("user-1");
+    expect(daily.limit).toHaveBeenCalledWith("user-1");
+  });
+});
+
+describe("checkClaimRateLimit", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("按 user 与 ip 双维度校验,任一超限即失败", async () => {
+    const limiter = {
+      limit: vi
+        .fn()
+        .mockResolvedValueOnce({ success: true, reset: 10 })
+        .mockResolvedValueOnce({ success: false, reset: 20 }),
+    };
+    await expect(
+      checkClaimRateLimit("user-1", "1.2.3.4", limiter as never),
+    ).resolves.toEqual({ success: false, reset: 20 });
+    expect(limiter.limit).toHaveBeenCalledWith("user:user-1");
+    expect(limiter.limit).toHaveBeenCalledWith("ip:1.2.3.4");
   });
 });
