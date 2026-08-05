@@ -28,7 +28,6 @@ export default function PublishPage() {
   return (
     <div className="space-y-6 px-4 py-6">
       <header className="space-y-1">
-        <p className="text-sm font-medium text-blue-600">发布拼图</p>
         <h1 className="text-2xl font-bold tracking-tight text-slate-950">
           分享或求助一块拼图
         </h1>
