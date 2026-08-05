@@ -77,15 +77,33 @@ describe("ClaimDrawer", () => {
 
     expect(screen.getByRole("button", { name: "使用口令领取" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "使用链接领取" })).toBeInTheDocument();
+    const buttons = screen.getAllByRole("button");
+    const linkIndex = buttons.findIndex((button) =>
+      button.textContent?.includes("使用链接领取"),
+    );
+    const commandIndex = buttons.findIndex((button) =>
+      button.textContent?.includes("使用口令领取"),
+    );
+    expect(linkIndex).toBeGreaterThanOrEqual(0);
+    expect(commandIndex).toBeGreaterThan(linkIndex);
   });
 
-  it("打开抽屉和取消不会请求领取 API", () => {
+  it("根据帖子类型显示领取或助力标题", () => {
+    renderDrawer(commandPost);
+    expect(screen.getByText("领取 8折 6 号拼图")).toBeInTheDocument();
+
+    cleanup();
+    renderDrawer({ ...commandPost, type: "REQUEST" });
+    expect(screen.getByText("助力 8折 6 号拼图")).toBeInTheDocument();
+  });
+
+  it("打开抽屉和关闭不会请求领取 API", () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     const { onOpenChange } = renderDrawer();
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    fireEvent.click(screen.getByRole("button", { name: "关闭领取弹窗" }));
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });

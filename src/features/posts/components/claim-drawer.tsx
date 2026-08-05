@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Copy, ExternalLink, Smartphone } from "lucide-react";
+import { Copy, ExternalLink, Smartphone, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -153,13 +153,26 @@ export function ClaimDrawer({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange} showSwipeHandle>
-      <DrawerContent>
-        <DrawerHeader>
-          <DrawerTitle>确认领取拼图</DrawerTitle>
-          <DrawerDescription>
-            {post.discount === 95 ? "95折" : post.discount === 90 ? "9折" : "8折"}
-            {post.pieceNumber}号 · {post.type === "GIVE" ? "赠送" : "求助"}
-          </DrawerDescription>
+      <DrawerContent className="mx-auto max-w-[420px] rounded-t-[20px] border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+        <button
+          type="button"
+          aria-label="关闭领取弹窗"
+          onClick={() => onOpenChange(false)}
+          className="absolute right-4 top-4 z-10 flex size-[30px] items-center justify-center rounded-full bg-slate-100 text-slate-400 transition hover:bg-slate-200"
+        >
+          <X className="size-4" aria-hidden="true" />
+        </button>
+        <DrawerHeader className="text-center">
+          <DrawerTitle>
+            {post.type === "GIVE" ? "领取" : "助力"}{" "}
+            {post.discount === 95
+              ? "95折"
+              : post.discount === 90
+                ? "9折"
+                : "8折"}{" "}
+            {post.pieceNumber} 号拼图
+          </DrawerTitle>
+          <DrawerDescription>请选择获取方式</DrawerDescription>
         </DrawerHeader>
 
         <div className="space-y-3 px-4 py-5">
@@ -211,24 +224,10 @@ export function ClaimDrawer({
         <DrawerFooter>
           {!claimedPayloads ? (
             <>
-              {hasCommand ? (
-                <Button
-                  type="button"
-                  className="h-11"
-                  disabled={!identityReady || submitting}
-                  onClick={() => void handleClaim("COMMAND")}
-                >
-                  <Copy data-icon="inline-start" />
-                  {submitting && pendingMethod === "COMMAND"
-                    ? "正在领取…"
-                    : "使用口令领取"}
-                </Button>
-              ) : null}
               {hasUrl ? (
                 <Button
                   type="button"
-                  className="h-11"
-                  variant={hasCommand ? "outline" : "default"}
+                  className="h-12 rounded-xl"
                   disabled={!identityReady || submitting}
                   onClick={() => void handleClaim("URL")}
                 >
@@ -236,6 +235,20 @@ export function ClaimDrawer({
                   {submitting && pendingMethod === "URL"
                     ? "正在领取…"
                     : "使用链接领取"}
+                </Button>
+              ) : null}
+              {hasCommand ? (
+                <Button
+                  type="button"
+                  className="h-12 rounded-xl"
+                  variant={hasUrl ? "secondary" : "default"}
+                  disabled={!identityReady || submitting}
+                  onClick={() => void handleClaim("COMMAND")}
+                >
+                  <Copy data-icon="inline-start" />
+                  {submitting && pendingMethod === "COMMAND"
+                    ? "正在领取…"
+                    : "使用口令领取"}
                 </Button>
               ) : null}
             </>
@@ -264,9 +277,6 @@ export function ClaimDrawer({
               ) : null}
             </>
           ) : null}
-          <Button type="button" className="h-11" variant="outline" onClick={() => onOpenChange(false)}>
-            {claimedPayloads ? "关闭" : "取消"}
-          </Button>
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
