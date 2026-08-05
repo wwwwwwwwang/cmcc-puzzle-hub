@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { HallPostDto } from "@/features/posts/domain/types";
@@ -13,6 +13,21 @@ type PostCardProps = {
 
 export function PostCard({ post, onRemoved }: PostCardProps) {
   const [open, setOpen] = useState(false);
+  const claimedRef = useRef(false);
+
+  const sourceLabel =
+    post.availablePayloadKinds.length === 2
+      ? "口令 + 链接"
+      : post.availablePayloadKinds[0] === "COMMAND"
+        ? "口令"
+        : "链接";
+
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    if (!nextOpen && claimedRef.current) {
+      onRemoved?.(post.id);
+    }
+  }
 
   return (
     <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -23,7 +38,7 @@ export function PostCard({ post, onRemoved }: PostCardProps) {
             {post.pieceNumber}号拼图
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            {post.type === "GIVE" ? "赠送" : "求助"} · {post.payloadKind === "COMMAND" ? "口令" : "链接"}
+            {post.type === "GIVE" ? "赠送" : "求助"} · {sourceLabel}
           </p>
         </div>
         <Button type="button" onClick={() => setOpen(true)}>
@@ -34,10 +49,9 @@ export function PostCard({ post, onRemoved }: PostCardProps) {
         <ClaimDrawer
           post={post}
           open={open}
-          onOpenChange={setOpen}
-          onClaimed={(postId) => {
-            setOpen(false);
-            onRemoved?.(postId);
+          onOpenChange={handleOpenChange}
+          onClaimed={() => {
+            claimedRef.current = true;
           }}
         />
       ) : null}
