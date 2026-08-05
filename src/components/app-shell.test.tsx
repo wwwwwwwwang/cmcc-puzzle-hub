@@ -14,11 +14,12 @@ describe("AppShell", () => {
     const { container } = render(<AppShell>content</AppShell>);
     const shell = container.firstElementChild;
 
-    expect(shell).toHaveClass("min-h-dvh", "max-w-md");
+    expect(shell).toHaveClass("min-h-dvh", "max-w-[420px]");
     expect(screen.getByRole("main")).toHaveClass(
       "pb-[calc(4rem+env(safe-area-inset-bottom))]",
     );
     expect(screen.getByRole("navigation", { name: "主要导航" })).toHaveClass(
+      "max-w-[420px]",
       "pb-[env(safe-area-inset-bottom)]",
     );
   });

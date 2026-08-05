@@ -15,7 +15,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="主要导航"
-      className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[420px] border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
     >
       <div className="grid h-16 grid-cols-2">
         {navItems.map(({ href, label, icon: Icon }) => {
