@@ -5,6 +5,7 @@ import {
   GIVE_COMMAND,
   GIVE_NORMALIZED_COMMAND,
   GIVE_URL,
+  REQUEST_COMMAND,
 } from "../fixtures/cmcc-samples";
 
 const commandPost = {
@@ -105,12 +106,14 @@ test.beforeEach(async ({ context }) => {
 test("仅口令发布和领取保持复制后唤起顺序", async ({ page }) => {
   const calls = await installApiMocks(page);
   await page.goto("/publish");
+  await page.getByRole("button", { name: "赠送拼图" }).click();
   await page.getByRole("radio", { name: "8折6号拼图" }).click();
   await page.getByLabel("拼图口令").fill(GIVE_COMMAND);
   await page.getByRole("button", { name: "发布" }).click();
 
   await expect(page).toHaveURL(/\/$/);
   expect(JSON.parse(calls.publishBodies[0])).toMatchObject({
+    type: "GIVE",
     sources: { command: GIVE_COMMAND },
   });
 
@@ -142,6 +145,7 @@ test("仅二维码链接发布和领取不上传图片", async ({ page }) => {
   });
   await interceptCmccNavigation(page);
   await page.goto("/publish");
+  await page.getByRole("button", { name: "赠送拼图" }).click();
   await page.getByRole("radio", { name: "8折6号拼图" }).click();
   await page.getByRole("tab", { name: "上传二维码" }).click();
   await page
@@ -152,6 +156,7 @@ test("仅二维码链接发布和领取不上传图片", async ({ page }) => {
 
   await expect.poll(() => calls.publishBodies.length).toBe(1);
   const body = JSON.parse(calls.publishBodies[0]);
+  expect(body.type).toBe("GIVE");
   expect(body.sources).toEqual({ url: GIVE_URL });
   expect(calls.publishBodies[0]).not.toContain("multipart");
   expect(calls.publishBodies[0]).not.toContain("data:image");
@@ -169,6 +174,7 @@ test("双来源复制失败后改用链接不会重复领取", async ({ page }) 
   });
   await interceptCmccNavigation(page);
   await page.goto("/publish");
+  await page.getByRole("button", { name: "赠送拼图" }).click();
   await page.getByRole("radio", { name: "8折6号拼图" }).click();
   await page.getByLabel("拼图口令").fill(GIVE_COMMAND);
   await page.getByRole("tab", { name: "上传二维码" }).click();
@@ -179,6 +185,7 @@ test("双来源复制失败后改用链接不会重复领取", async ({ page }) 
   await page.getByRole("button", { name: "发布" }).click();
 
   const body = JSON.parse(calls.publishBodies[0]);
+  expect(body.type).toBe("GIVE");
   expect(body.sources).toEqual({ command: GIVE_COMMAND, url: GIVE_URL });
   await page.evaluate(() => {
     (window as Window & { __clipboardShouldFail?: boolean }).__clipboardShouldFail = true;
@@ -195,6 +202,39 @@ test("双来源复制失败后改用链接不会重复领取", async ({ page }) 
   await page.getByRole("button", { name: "改用链接" }).click();
   await page.waitForURL((url) => url.hostname === "h.app.coc.10086.cn");
   expect(calls.claim).toBe(1);
+});
+
+test("发布页要求先选类型并阻止类型冲突", async ({ page }) => {
+  const calls = await installApiMocks(page);
+  await page.goto("/publish");
+
+  await expect(page.getByRole("radio", { name: "8折1号拼图" })).toBeDisabled();
+  await expect(page.getByLabel("拼图口令")).toBeDisabled();
+  await page.getByRole("button", { name: "求助拼图" }).click();
+  await page.getByRole("radio", { name: "8折6号拼图" }).click();
+  await page.getByLabel("拼图口令").fill(GIVE_COMMAND);
+  await expect(
+    page.getByText("选择的是求助，但内容识别为赠送，请更换内容或发布类型"),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "发布" })).toBeDisabled();
+  expect(calls.publishBodies).toHaveLength(0);
+});
+
+test("求助内容按类型优先流程发布", async ({ page }) => {
+  const calls = await installApiMocks(page);
+  await page.goto("/publish");
+
+  await page.getByRole("button", { name: "求助拼图" }).click();
+  await page.getByRole("radio", { name: "8折1号拼图" }).click();
+  await page.getByLabel("拼图口令").fill(REQUEST_COMMAND);
+  await expect(page.getByText("8折1号·求助")).toBeVisible();
+  await page.getByRole("button", { name: "发布" }).click();
+
+  await expect.poll(() => calls.publishBodies.length).toBe(1);
+  expect(JSON.parse(calls.publishBodies[0])).toMatchObject({
+    type: "REQUEST",
+    sources: { command: REQUEST_COMMAND },
+  });
 });
 
 test("大厅按参考稿筛选折扣、类型和拼图编号", async ({ page }) => {
@@ -243,6 +283,7 @@ test("大厅、领取抽屉和发布页无横向溢出", async ({ page }) => {
     .toBe(true);
 
   await page.goto("/publish");
+  await page.getByRole("button", { name: "赠送拼图" }).click();
   await page.getByRole("radio", { name: "8折6号拼图" }).click();
   await page.getByRole("tab", { name: "上传二维码" }).click();
   await expect
