@@ -2,6 +2,12 @@
 
 移动端优先的中国移动拼图互助 H5。用户发布时至少提供口令或二维码链接中的一种，也可以同时保存两种来源；领取者可选择更适合自己的方式。记录 24 小时后自动过期，首位领取者通过 Redis 原子下架。
 
+> [!IMPORTANT]
+> 本项目是社区维护的非官方开源工具，与中国移动通信集团有限公司及其关联公司无隶属、授权、赞助或背书关系。“中国移动”及相关商标归其权利人所有。本项目不保证第三方活动接口、口令、二维码、Deep Link 或客户端行为长期有效；使用者应遵守活动规则、平台条款和适用法律，并自行承担使用风险。
+
+- 源码仓库：<https://github.com/wwwwwwwwang/cmcc-puzzle-hub>
+- 零预算部署与开源步骤：[docs/零预算部署与开源指南.md](docs/零预算部署与开源指南.md)
+
 ## 本地运行
 
 环境要求：Node.js 22、pnpm 10。
@@ -72,3 +78,7 @@ PUBLISH_LIMIT_PER_HOUR=10
 - `src/**/*.test.*`：领域、设备、仓储、API 和组件单测。
 - `src/**/*.integration.test.ts`：专用 Upstash Redis 集成测试。
 - `tests/e2e/`：Chromium/WebKit 移动流程、二维码隐私和横向溢出检查。
+
+## 许可证
+
+本项目以 [GNU Affero General Public License v3.0](LICENSE) 发布。通过网络向用户提供修改后的版本时，必须按 AGPL-3.0 的要求向这些用户提供对应版本的完整源码。
