@@ -56,10 +56,10 @@ suite(
             type: "GIVE",
             discount: 95,
             pieceNumber: 1,
-            payloadKind: "COMMAND",
-            payload: `secret-command-${round}`,
+            availablePayloadKinds: ["COMMAND"],
+            payloads: { command: `secret-command-${round}` },
             publisherDeviceHash,
-            payloadHash,
+            payloadHashes: { command: payloadHash },
             createdAt: createdAt.toISOString(),
             expiresAt: expiresAt.toISOString(),
           },
@@ -86,8 +86,7 @@ suite(
 
         expect(winner).toMatchObject({
           status: "CLAIMED",
-          payloadKind: "COMMAND",
-          payload: `secret-command-${round}`,
+          payloads: { command: `secret-command-${round}` },
           idempotent: false,
         });
         expect(loser).toEqual({ status: "ALREADY_CLAIMED" });
@@ -98,7 +97,7 @@ suite(
           repository.claimPost(id, winnerHash, { redis, prefix }),
         ).resolves.toMatchObject({
           status: "CLAIMED",
-          payload: `secret-command-${round}`,
+          payloads: { command: `secret-command-${round}` },
           idempotent: true,
         });
         await expect(
@@ -111,7 +110,7 @@ suite(
         for (const indexKey of indexKeys) {
           expect(await redis.zscore(indexKey, id)).toBeNull();
         }
-        expect(await redis.get(dedupeRedisKey)).not.toBeNull();
+        expect(await redis.get(dedupeRedisKey)).toBeNull();
       }
     });
 

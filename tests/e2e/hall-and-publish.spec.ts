@@ -1,32 +1,67 @@
 import { expect, test, type Page } from "@playwright/test";
 import { resolve } from "node:path";
 
-const GIVE_COMMAND =
-  "送你一张多余的‘8折6号拼图’！，快来一起集拼图，8折充值券等你来赢，￥19uSvG￥ 复制此消息，打开中国移动客户端，马上领取。";
-const GIVE_URL =
-  "https://h.app.coc.10086.cn/activity/zx/transit/transferDownload.html?targetUrl=https%3A%2F%2Fwx.10086.cn%2Fhlwyxhdhub%2Fact-wedrecharge%2F1024101716%3FgiveCard%3De728c7fc81f771f07c0491ee1afeac6c602855ea6c6ff236550705d032fa902eec43f56ac39454c76f35cef683460bb4&pageId=99992603311033047&channelId=P00000116211&sellerId=1636941HD1301000012";
+import {
+  GIVE_COMMAND,
+  GIVE_NORMALIZED_COMMAND,
+  GIVE_URL,
+} from "../fixtures/cmcc-samples";
 
 const commandPost = {
   id: "p_1800000000000_123e4567-e89b-42d3-a456-426614174000",
   type: "GIVE",
   discount: 80,
   pieceNumber: 6,
-  payloadKind: "COMMAND",
+  availablePayloadKinds: ["COMMAND"],
   createdAt: "2027-01-15T08:00:00.000Z",
   expiresAt: "2027-01-16T08:00:00.000Z",
 };
 
-async function installApiMocks(page: Page, post = commandPost) {
+const urlPost = { ...commandPost, availablePayloadKinds: ["URL"] };
+const dualPost = {
+  ...commandPost,
+  availablePayloadKinds: ["COMMAND", "URL"],
+};
+
+type ApiMockOptions = {
+  post?: typeof commandPost;
+  payloads?: { command?: string; url?: string };
+};
+
+async function installApiMocks(
+  page: Page,
+  { post = commandPost, payloads = { command: GIVE_NORMALIZED_COMMAND } }: ApiMockOptions = {},
+) {
+  const calls = { claim: 0, publishBodies: [] as string[] };
+
   await page.route("**/api/posts**", async (route) => {
-    if (route.request().method() === "GET") {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+
+    if (pathname.endsWith("/claim")) {
+      calls.claim += 1;
+      await route.fulfill({ json: { payloads, idempotent: false } });
+      return;
+    }
+
+    if (request.method() === "GET") {
       await route.fulfill({ json: { items: [post], nextCursor: null } });
       return;
     }
+
+    calls.publishBodies.push(request.postData() ?? "");
     await route.fulfill({ status: 201, json: { post } });
   });
-  await page.route("**/api/posts/*/claim", async (route) => {
+
+  return calls;
+}
+
+async function interceptCmccNavigation(page: Page) {
+  await page.route("https://h.app.coc.10086.cn/**", async (route) => {
     await route.fulfill({
-      json: { payloadKind: "COMMAND", payload: "￥19uSvG￥" },
+      status: 200,
+      contentType: "text/html",
+      body: "<!doctype html><title>CMCC</title>",
     });
   });
 }
@@ -34,68 +69,144 @@ async function installApiMocks(page: Page, post = commandPost) {
 test.beforeEach(async ({ context }) => {
   await context.addInitScript(() => {
     localStorage.setItem("cmcc-puzzle-device-id", "e2e-device-id");
-    (window as Window & { __launchCalls?: string[] }).__launchCalls = [];
-    (window as Window & { __clipboardText?: string }).__clipboardText = "";
+    const testWindow = window as Window & {
+      __claimEvents?: string[];
+      __clipboardShouldFail?: boolean;
+      __clipboardText?: string;
+      __CMCC_LAUNCH_APP__?: (url: string) => void;
+    };
+    testWindow.__claimEvents = [];
+    testWindow.__clipboardShouldFail = false;
+    testWindow.__clipboardText = "";
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: {
         writeText: async (value: string) => {
-          (window as Window & { __clipboardText?: string }).__clipboardText = value;
+          if (testWindow.__clipboardShouldFail) {
+            throw new Error("clipboard denied");
+          }
+          testWindow.__clipboardText = value;
+          testWindow.__claimEvents?.push(`clipboard:${value}`);
         },
-        readText: async () =>
-          (window as Window & { __clipboardText?: string }).__clipboardText ?? "",
+        readText: async () => testWindow.__clipboardText ?? "",
       },
     });
-    (window as Window & { __CMCC_LAUNCH_APP__?: (url: string) => void }).__CMCC_LAUNCH_APP__ =
-      (url) => {
-        ((window as Window & { __launchCalls?: string[] }).__launchCalls ??= []).push(url);
-      };
+    testWindow.__CMCC_LAUNCH_APP__ = (url) => {
+      testWindow.__claimEvents?.push(`launch:${url}`);
+    };
   });
 });
 
-test("口令发布到领取闭环只在确认后请求并提示手动打开", async ({ page }) => {
-  await installApiMocks(page);
+test("仅口令发布和领取保持复制后唤起顺序", async ({ page }) => {
+  const calls = await installApiMocks(page);
   await page.goto("/publish");
   await page.getByRole("radio", { name: "8折6号拼图" }).click();
   await page.getByLabel("拼图口令").fill(GIVE_COMMAND);
   await page.getByRole("button", { name: "发布" }).click();
+
   await expect(page).toHaveURL(/\/$/);
+  expect(JSON.parse(calls.publishBodies[0])).toMatchObject({
+    sources: { command: GIVE_COMMAND },
+  });
+
   await page.getByRole("button", { name: "领取" }).click();
   await page.getByRole("button", { name: "取消" }).click();
+  expect(calls.claim).toBe(0);
   await page.getByRole("button", { name: "领取" }).click();
-  await page.getByRole("button", { name: "确认领取" }).click();
+  await page.getByRole("button", { name: "使用口令领取" }).click();
+
   await expect(page.getByText("若未自动跳转，请手动打开中国移动 APP")).toBeVisible();
-  await expect.poll(() => page.evaluate(() => (window as Window & { __launchCalls?: string[] }).__launchCalls)).toEqual([
-    "leadeon://",
-  ]);
-  await expect.poll(async () => await page.evaluate(() => navigator.clipboard.readText())).toBe("￥19uSvG￥");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { __claimEvents?: string[] }).__claimEvents,
+      ),
+    )
+    .toEqual([
+      `clipboard:${GIVE_NORMALIZED_COMMAND}`,
+      "launch:leadeon://",
+    ]);
+  expect(calls.claim).toBe(1);
 });
 
-test("二维码解析提交不上传图片", async ({ page }) => {
-  const bodies: string[] = [];
-  await page.route("**/api/posts**", async (route) => {
-    if (route.request().method() === "POST") bodies.push(route.request().postData() ?? "");
-    if (route.request().method() === "GET") {
-      await route.fulfill({ json: { items: [], nextCursor: null } });
-      return;
-    }
-    await route.fulfill({ status: 201, json: { post: commandPost } });
+test("仅二维码链接发布和领取不上传图片", async ({ page }) => {
+  const calls = await installApiMocks(page, {
+    post: urlPost,
+    payloads: { url: GIVE_URL },
   });
+  await interceptCmccNavigation(page);
   await page.goto("/publish");
   await page.getByRole("radio", { name: "8折6号拼图" }).click();
-  await page.getByLabel("选择二维码图片").setInputFiles(resolve("tests/fixtures/give-url-qr.png"));
+  await page.getByRole("tab", { name: "上传二维码" }).click();
+  await page
+    .getByLabel("选择二维码图片")
+    .setInputFiles(resolve("tests/fixtures/give-url-qr.png"));
   await expect(page.getByText("8折6号·赠送")).toBeVisible();
   await page.getByRole("button", { name: "发布" }).click();
-  await expect.poll(() => bodies.length).toBe(1);
-  expect(bodies[0]).toContain(GIVE_URL);
-  expect(bodies[0]).not.toContain("multipart");
-  expect(bodies[0]).not.toContain("data:image");
+
+  await expect.poll(() => calls.publishBodies.length).toBe(1);
+  const body = JSON.parse(calls.publishBodies[0]);
+  expect(body.sources).toEqual({ url: GIVE_URL });
+  expect(calls.publishBodies[0]).not.toContain("multipart");
+  expect(calls.publishBodies[0]).not.toContain("data:image");
+
+  await page.getByRole("button", { name: "领取" }).click();
+  await page.getByRole("button", { name: "使用链接领取" }).click();
+  await page.waitForURL((url) => url.hostname === "h.app.coc.10086.cn");
+  expect(calls.claim).toBe(1);
 });
 
-test("移动视口无横向溢出", async ({ page }) => {
-  await installApiMocks(page);
-  await page.goto("/");
-  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+test("双来源复制失败后改用链接不会重复领取", async ({ page }) => {
+  const calls = await installApiMocks(page, {
+    post: dualPost,
+    payloads: { command: GIVE_NORMALIZED_COMMAND, url: GIVE_URL },
+  });
+  await interceptCmccNavigation(page);
+  await page.goto("/publish");
+  await page.getByRole("radio", { name: "8折6号拼图" }).click();
+  await page.getByLabel("拼图口令").fill(GIVE_COMMAND);
+  await page.getByRole("tab", { name: "上传二维码" }).click();
+  await page
+    .getByLabel("选择二维码图片")
+    .setInputFiles(resolve("tests/fixtures/give-url-qr.png"));
+  await expect(page.getByText("将保存：口令 + 链接")).toBeVisible();
+  await page.getByRole("button", { name: "发布" }).click();
+
+  const body = JSON.parse(calls.publishBodies[0]);
+  expect(body.sources).toEqual({ command: GIVE_COMMAND, url: GIVE_URL });
+  await page.evaluate(() => {
+    (window as Window & { __clipboardShouldFail?: boolean }).__clipboardShouldFail = true;
+  });
+
   await page.getByRole("button", { name: "领取" }).click();
-  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await expect(page.getByRole("button", { name: "使用口令领取" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "使用链接领取" })).toBeVisible();
+  await page.getByRole("button", { name: "使用口令领取" }).click();
+  await expect(page.getByRole("alert")).toContainText("复制失败");
+  await expect(page.getByText(GIVE_NORMALIZED_COMMAND)).toBeVisible();
+  expect(calls.claim).toBe(1);
+
+  await page.getByRole("button", { name: "改用链接" }).click();
+  await page.waitForURL((url) => url.hostname === "h.app.coc.10086.cn");
+  expect(calls.claim).toBe(1);
+});
+
+test("大厅、领取抽屉和发布页无横向溢出", async ({ page }) => {
+  await installApiMocks(page, { post: dualPost });
+  await page.goto("/");
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true);
+  await page.getByRole("button", { name: "领取" }).click();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true);
+
+  await page.goto("/publish");
+  await page.getByRole("radio", { name: "8折6号拼图" }).click();
+  await page.getByRole("tab", { name: "上传二维码" }).click();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true);
 });

@@ -8,7 +8,7 @@ const post = {
   type: "GIVE" as const,
   discount: 80 as const,
   pieceNumber: 6,
-  payloadKind: "COMMAND" as const,
+  availablePayloadKinds: ["COMMAND" as const],
   createdAt: "2026-01-01T00:00:00.000Z",
   expiresAt: "2026-01-02T00:00:00.000Z",
 };

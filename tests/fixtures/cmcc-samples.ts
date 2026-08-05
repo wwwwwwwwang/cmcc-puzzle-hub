@@ -1,6 +1,8 @@
 export const GIVE_COMMAND =
   "送你一张多余的‘8折6号拼图’！，快来一起集拼图，8折充值券等你来赢，￥19uSvG￥ 复制此消息，打开中国移动客户端，马上领取。";
 
+export const GIVE_NORMALIZED_COMMAND = "￥19uSvG￥";
+
 export const REQUEST_COMMAND =
   "我正在集拼图赢8折充值券，还差一张‘8折1号拼图’，￥19uSvR￥ 复制此消息，打开中国移动客户端为我助力，你也能参与得好礼哦。";
 

@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { Redis } from "@upstash/redis";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import type { StoredPost } from "@/features/posts/domain/types";
+
 vi.mock("server-only", () => ({}));
 
 const testUrl = process.env.TEST_UPSTASH_REDIS_REST_URL;
@@ -36,20 +38,20 @@ suite(
     it("原子发布设置 TTL、四个索引和去重", async () => {
       const createdAt = new Date();
       const expiresAt = new Date(createdAt.getTime() + 86_400_000);
-      const input = {
-        type: "GIVE" as const,
-        discount: 95 as const,
+      const input: Omit<StoredPost, "id"> = {
+        type: "GIVE",
+        discount: 95,
         pieceNumber: 1,
-        payloadKind: "COMMAND" as const,
-        payload: "integration-secret-command",
+        availablePayloadKinds: ["COMMAND"],
+        payloads: { command: "integration-secret-command" },
         publisherDeviceHash: randomUUID(),
-        payloadHash: randomUUID(),
+        payloadHashes: { command: randomUUID() },
         createdAt: createdAt.toISOString(),
         expiresAt: expiresAt.toISOString(),
       };
       const firstUuid = "00000000-0000-4000-8000-000000000001";
       const firstId = `p_${expiresAt.getTime()}_${firstUuid}`;
-      const dedupeRedisKey = keys.dedupeKey(input.payloadHash, prefix);
+      const dedupeRedisKey = keys.dedupeKey(input.payloadHashes.command!, prefix);
       const indexKeys = [
         keys.allIndexKey(prefix),
         keys.typeIndexKey(input.type, prefix),
@@ -87,22 +89,24 @@ suite(
         { redis, prefix },
       );
       expect(page.items[0]).not.toHaveProperty("payload");
+      expect(page.items[0]).not.toHaveProperty("payloads");
       expect(page.items[0]).not.toHaveProperty("publisherDeviceHash");
       expect(page.items[0]).not.toHaveProperty("payloadHash");
+      expect(page.items[0]).not.toHaveProperty("payloadHashes");
 
       const otherInputs = [
         {
           ...input,
           type: "REQUEST" as const,
-          payload: "integration-request-command",
-          payloadHash: randomUUID(),
+          payloads: { command: "integration-request-command" },
+          payloadHashes: { command: randomUUID() },
         },
         {
           ...input,
           discount: 80 as const,
           pieceNumber: 9,
-          payload: "integration-80-command",
-          payloadHash: randomUUID(),
+          payloads: { command: "integration-80-command" },
+          payloadHashes: { command: randomUUID() },
         },
       ];
 
@@ -111,7 +115,7 @@ suite(
         const id = `p_${expiresAt.getTime()}_${uuid}`;
         [
           keys.postKey(id, prefix),
-          keys.dedupeKey(otherInput.payloadHash, prefix),
+          keys.dedupeKey(otherInput.payloadHashes.command!, prefix),
           keys.allIndexKey(prefix),
           keys.typeIndexKey(otherInput.type, prefix),
           keys.discountIndexKey(otherInput.discount, prefix),
