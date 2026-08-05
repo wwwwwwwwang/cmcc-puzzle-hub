@@ -381,15 +381,13 @@ async function cleanupOrphans(
 }
 
 function parseClaimResult(value: unknown): ClaimPostResult {
-  if (typeof value !== "string") {
-    throw new Error("Invalid claim script result");
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value);
-  } catch {
-    throw new Error("Invalid claim script result");
+  let parsed: unknown = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      throw new Error("Invalid claim script result");
+    }
   }
 
   if (!isRecord(parsed) || typeof parsed.status !== "string") {

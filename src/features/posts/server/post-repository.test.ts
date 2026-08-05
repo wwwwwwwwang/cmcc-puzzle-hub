@@ -352,6 +352,36 @@ describe("claimPost", () => {
     ]);
   });
 
+  it("解析 Upstash 自动反序列化后的对象结果", async () => {
+    const redis = createRedis({
+      eval: vi.fn(async () => ({
+        status: "CLAIMED",
+        payloads: basePost.payloads,
+        idempotent: false,
+      })),
+    });
+
+    await expect(claimPost(postId, "claimant-hash", { redis })).resolves.toEqual({
+      status: "CLAIMED",
+      payloads: basePost.payloads,
+      idempotent: false,
+    });
+  });
+
+  it("拒绝 Upstash 自动反序列化后的畸形对象结果", async () => {
+    const redis = createRedis({
+      eval: vi.fn(async () => ({
+        status: "CLAIMED",
+        payloads: basePost.payloads,
+        idempotent: "false",
+      })),
+    });
+
+    await expect(claimPost(postId, "claimant-hash", { redis })).rejects.toThrow(
+      /claim script result/i,
+    );
+  });
+
   it.each([
     ["SELF_CLAIM_FORBIDDEN", { status: "SELF_CLAIM_FORBIDDEN" }],
     ["ALREADY_CLAIMED", { status: "ALREADY_CLAIMED" }],
