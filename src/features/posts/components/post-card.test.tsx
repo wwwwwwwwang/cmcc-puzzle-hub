@@ -44,7 +44,9 @@ describe("PostCard", () => {
 
     expect(screen.getByText("出/赠")).toBeInTheDocument();
     expect(screen.getByText("8折 · 第 6 号")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "一键获取" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "一键获取" })).toHaveClass(
+      "bg-blue-600",
+    );
   });
 
   it("点击卡片领取按钮只打开确认抽屉，不请求 API", async () => {

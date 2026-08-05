@@ -75,8 +75,10 @@ describe("ClaimDrawer", () => {
   it("双来源帖子同时显示口令和链接领取动作", () => {
     renderDrawer(dualPost);
 
-    expect(screen.getByRole("button", { name: "使用口令领取" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "使用链接领取" })).toBeInTheDocument();
+    const commandButton = screen.getByRole("button", { name: "使用口令领取" });
+    const linkButton = screen.getByRole("button", { name: "使用链接领取" });
+    expect(commandButton).toBeInTheDocument();
+    expect(linkButton).toHaveClass("bg-blue-600");
     const buttons = screen.getAllByRole("button");
     const linkIndex = buttons.findIndex((button) =>
       button.textContent?.includes("使用链接领取"),
@@ -86,6 +88,19 @@ describe("ClaimDrawer", () => {
     );
     expect(linkIndex).toBeGreaterThanOrEqual(0);
     expect(commandIndex).toBeGreaterThan(linkIndex);
+  });
+
+  it("单一来源领取动作使用蓝色主按钮", () => {
+    renderDrawer(commandPost);
+    expect(screen.getByRole("button", { name: "使用口令领取" })).toHaveClass(
+      "bg-blue-600",
+    );
+
+    cleanup();
+    renderDrawer(urlPost);
+    expect(screen.getByRole("button", { name: "使用链接领取" })).toHaveClass(
+      "bg-blue-600",
+    );
   });
 
   it("根据帖子类型显示领取或助力标题", () => {

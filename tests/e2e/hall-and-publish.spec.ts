@@ -227,6 +227,13 @@ test("大厅、领取抽屉和发布页无横向溢出", async ({ page }) => {
   await expect(page.getByText("最新发布")).toBeVisible();
   await expect(page.getByRole("button", { name: "刷新" })).toBeVisible();
   await expect(page.getByRole("button", { name: "一键获取" })).toBeVisible();
+  await expect(page.getByRole("radiogroup", { name: "8折拼图选择" })).toHaveCSS(
+    "width",
+    "270px",
+  );
+  await expect
+    .poll(() => page.evaluate(() => getComputedStyle(document.querySelector("header")!).position))
+    .toBe("sticky");
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
     .toBe(true);

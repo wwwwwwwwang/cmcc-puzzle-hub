@@ -227,7 +227,7 @@ export function ClaimDrawer({
               {hasUrl ? (
                 <Button
                   type="button"
-                  className="h-12 rounded-xl"
+                  className="h-12 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
                   disabled={!identityReady || submitting}
                   onClick={() => void handleClaim("URL")}
                 >
@@ -240,7 +240,11 @@ export function ClaimDrawer({
               {hasCommand ? (
                 <Button
                   type="button"
-                  className="h-12 rounded-xl"
+                  className={`h-12 rounded-xl ${
+                    hasUrl
+                      ? ""
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
                   variant={hasUrl ? "secondary" : "default"}
                   disabled={!identityReady || submitting}
                   onClick={() => void handleClaim("COMMAND")}

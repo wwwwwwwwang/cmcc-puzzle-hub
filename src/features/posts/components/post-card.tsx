@@ -60,7 +60,7 @@ export function PostCard({ post, onRemoved }: PostCardProps) {
         <Button
           type="button"
           onClick={() => setOpen(true)}
-          className="shrink-0 rounded-full px-[18px] shadow-[0_2px_4px_rgba(37,99,235,0.2)]"
+          className="shrink-0 rounded-full bg-blue-600 px-[18px] text-white shadow-[0_2px_4px_rgba(37,99,235,0.2)] hover:bg-blue-700"
         >
           一键获取
         </Button>

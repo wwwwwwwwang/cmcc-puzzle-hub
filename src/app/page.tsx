@@ -10,7 +10,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   return (
     <section className="min-h-dvh bg-white">
-      <header className="sticky top-0 z-10 border-b border-slate-100 bg-gradient-to-b from-white to-slate-50 px-5 pb-2 pt-5 [@media(max-height:700px)]:static">
+      <header className="sticky top-0 z-10 border-b border-slate-100 bg-gradient-to-b from-white to-slate-50 px-5 pb-2 pt-5 [@media(max-height:700px)]:-top-[280px]">
         <h1 className="mb-4 text-[22px] font-bold tracking-tight text-slate-900">
           周三充值日拼图互助
         </h1>
