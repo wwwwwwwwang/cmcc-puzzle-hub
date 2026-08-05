@@ -1,4 +1,7 @@
-export type DomainErrorCode = "INVALID_CONTENT" | "SELECTION_MISMATCH";
+export type DomainErrorCode =
+  | "INVALID_CONTENT"
+  | "SELECTION_MISMATCH"
+  | "TYPE_MISMATCH";
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

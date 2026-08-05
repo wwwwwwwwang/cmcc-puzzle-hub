@@ -6,9 +6,15 @@ import {
   REQUEST_URL,
 } from "../../../../tests/fixtures/cmcc-samples";
 import { DomainError } from "./errors";
-import { parseSources } from "./parse-source";
+import { assertPostTypeMatches, parseSources } from "./parse-source";
 
 describe("parseSources", () => {
+  it("rejects a selected request type when content is a gift", () => {
+    expect(() => assertPostTypeMatches("GIVE", "REQUEST")).toThrowError(
+      "选择的是求助，但内容识别为赠送，请更换内容或发布类型",
+    );
+  });
+
   it("normalizes matching command and URL sources", () => {
     expect(
       parseSources(

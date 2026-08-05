@@ -35,6 +35,7 @@ function request(body: unknown) {
 }
 
 const baseInput = {
+  type: "GIVE" as const,
   selection: { discount: 80, pieceNumber: 6 },
   sources: { command: GIVE_COMMAND },
   visitorId: "visitor-id-123",
@@ -107,7 +108,9 @@ describe("/api/posts", () => {
       payloads: { url: REQUEST_URL },
     },
   ])("发布真实样本 $name", async ({ selection, sources, type, payloads }) => {
-    const response = await POST(request({ ...baseInput, selection, sources }));
+    const response = await POST(
+      request({ ...baseInput, type, selection, sources }),
+    );
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toHaveProperty("post");
     const published = publishPost.mock.calls[0][0];
@@ -127,6 +130,18 @@ describe("/api/posts", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "SELECTION_MISMATCH" },
     });
+  });
+
+  it("请求类型与内容类型不一致返回 400/TYPE_MISMATCH", async () => {
+    const response = await POST(
+      request({ ...baseInput, type: "REQUEST" }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "TYPE_MISMATCH" },
+    });
+    expect(publishPost).not.toHaveBeenCalled();
   });
 
   it("恶意 URL 返回 400/INVALID_CONTENT", async () => {

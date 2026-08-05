@@ -2,7 +2,10 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { hashVisitorId } from "@/features/posts/device/hash";
 import { DomainError } from "@/features/posts/domain/errors";
-import { parseSources } from "@/features/posts/domain/parse-source";
+import {
+  assertPostTypeMatches,
+  parseSources,
+} from "@/features/posts/domain/parse-source";
 import {
   createPostInputSchema,
   type CreatePostInput,
@@ -50,6 +53,7 @@ export async function POST(request: Request) {
     }
 
     const parsedSources = parseSources(input.sources, input.selection);
+    assertPostTypeMatches(parsedSources.type, input.type);
     const payloadHashes = {
       ...(parsedSources.sources.command
         ? {
