@@ -19,14 +19,37 @@ describe("PostFilters", () => {
     currentSearch = "";
   });
 
-  it("将 type 和 discount 写入 URLSearchParams 并清除旧游标", () => {
-    currentSearch = "cursor=opaque&type=GIVE";
-    render(<PostFilters />);
+  it("将筛选写入 URL 并清除旧游标和跨折扣编号", () => {
+    render(<PostFilters discount={80} type={undefined} pieceNumber={null} />);
 
-    fireEvent.change(screen.getByLabelText("类型筛选"), { target: { value: "REQUEST" } });
-    expect(replace).toHaveBeenCalledWith("/?type=REQUEST");
+    expect(screen.getByRole("button", { name: "8折(9块)" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "全部分类" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
-    fireEvent.change(screen.getByLabelText("折扣筛选"), { target: { value: "80" } });
-    expect(replace).toHaveBeenCalledWith("/?type=GIVE&discount=80");
+    fireEvent.click(screen.getByRole("button", { name: "只看求助" }));
+    expect(replace).toHaveBeenLastCalledWith("/?type=REQUEST", {
+      scroll: false,
+    });
+
+    currentSearch = "discount=80&pieceNumber=6&cursor=opaque";
+    cleanup();
+    render(<PostFilters discount={80} type={undefined} pieceNumber={6} />);
+    fireEvent.click(screen.getByRole("button", { name: "95折(4块)" }));
+    expect(replace).toHaveBeenLastCalledWith("/?discount=95", {
+      scroll: false,
+    });
+
+    currentSearch = "";
+    cleanup();
+    render(<PostFilters discount={80} type={undefined} pieceNumber={null} />);
+    fireEvent.click(screen.getByRole("radio", { name: "8折6号拼图" }));
+    expect(replace).toHaveBeenLastCalledWith("/?pieceNumber=6", {
+      scroll: false,
+    });
   });
 });
