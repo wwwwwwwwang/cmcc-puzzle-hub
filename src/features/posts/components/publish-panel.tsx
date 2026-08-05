@@ -11,11 +11,12 @@ import { useDeviceIdentity } from "@/features/posts/device/device-provider";
 import { DomainError } from "@/features/posts/domain/errors";
 import { parseSources } from "@/features/posts/domain/parse-source";
 import type { CreatePostInput } from "@/features/posts/domain/schemas";
-import type { Discount } from "@/features/posts/domain/types";
+import type { Discount, PostType } from "@/features/posts/domain/types";
 
 import { QrImagePicker, type DecodeImage } from "./qr-image-picker";
 
 type PublishPanelProps = {
+  postType?: PostType | null;
   discount: Discount;
   pieceNumber: number | null;
   decodeImage?: DecodeImage;
