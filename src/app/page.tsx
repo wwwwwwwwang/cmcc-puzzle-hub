@@ -10,7 +10,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   return (
     <section className="space-y-5 px-4 py-6">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950">拼图大厅</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-950">
+          周三充值日拼图互助
+        </h1>
         <p className="mt-1 text-sm text-slate-500">找到需要的拼图，确认后再领取</p>
       </header>
       <PostFilters />

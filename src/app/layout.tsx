@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "拼图互助",
-  description: "中国移动拼图互助大厅",
+  title: "周三充值日拼图互助",
+  description: "周三充值日拼图互助大厅",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
