@@ -35,7 +35,6 @@ type ClaimSuccess = {
 };
 
 const errorMessages: Record<string, string> = {
-  SELF_CLAIM_FORBIDDEN: "不能领取自己发布的内容",
   EXPIRED: "这条内容已过期",
   SERVICE_UNAVAILABLE: "服务暂时不可用，请稍后重试",
 };
@@ -55,13 +54,14 @@ export function ClaimDrawer({
   const [claimedPayloads, setClaimedPayloads] = useState<PostSources | null>(null);
   const [commandReady, setCommandReady] = useState(false);
   const submittingRef = useRef(false);
+  const actionNoun = post.type === "GIVE" ? "领取" : "助力";
 
   async function executeClaimMethod(method: PayloadKind, payloads: PostSources) {
     setError(null);
 
     if (method === "COMMAND") {
       if (!payloads.command) {
-        setError("领取口令不可用，请尝试链接领取");
+        setError(`${actionNoun}口令不可用，请尝试链接${actionNoun}`);
         return;
       }
 
@@ -79,14 +79,14 @@ export function ClaimDrawer({
     }
 
     if (!payloads.url) {
-      setError("领取链接不可用，请尝试口令领取");
+      setError(`${actionNoun}链接不可用，请尝试口令${actionNoun}`);
       return;
     }
 
     try {
       parseUrl(payloads.url);
     } catch {
-      setError("领取链接无效，请稍后重试");
+      setError(`${actionNoun}链接无效，请稍后重试`);
       return;
     }
     navigate(payloads.url);
@@ -125,13 +125,17 @@ export function ClaimDrawer({
           onOpenChange(false);
           return;
         }
-        setError(errorMessages[code] ?? "领取失败，请稍后重试");
+        setError(
+          code === "SELF_CLAIM_FORBIDDEN"
+            ? `不能${actionNoun}自己发布的内容`
+            : (errorMessages[code] ?? `${actionNoun}失败，请稍后重试`),
+        );
         return;
       }
 
       const result = readClaimSuccess(await response.json());
       if (!result) {
-        setError("领取结果无效，请稍后重试");
+        setError(`${actionNoun}结果无效，请稍后重试`);
         return;
       }
 
@@ -156,7 +160,7 @@ export function ClaimDrawer({
       <DrawerContent className="mx-auto max-w-[420px] rounded-t-[20px] border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
         <button
           type="button"
-          aria-label="关闭领取弹窗"
+          aria-label={`关闭${actionNoun}弹窗`}
           onClick={() => onOpenChange(false)}
           className="absolute right-4 top-4 z-10 flex size-[30px] items-center justify-center rounded-full bg-slate-100 text-slate-400 transition hover:bg-slate-200"
         >
@@ -172,14 +176,14 @@ export function ClaimDrawer({
                 : "8折"}{" "}
             {post.pieceNumber} 号拼图
           </DrawerTitle>
-          <DrawerDescription>请选择获取方式</DrawerDescription>
+          <DrawerDescription>请选择{actionNoun}方式</DrawerDescription>
         </DrawerHeader>
 
         <div className="space-y-3 px-4 py-5">
           <p className="text-sm text-slate-600">
             {hasCommand && hasUrl
-              ? "请选择更适合你的领取方式。"
-              : "确认后将领取并打开对应内容。"}
+              ? `请选择更适合你的${actionNoun}方式。`
+              : `确认后将${actionNoun}并打开对应内容。`}
           </p>
           {identity.status === "loading" ? (
             <p className="text-sm text-slate-500">正在准备设备身份…</p>
@@ -233,8 +237,8 @@ export function ClaimDrawer({
                 >
                   <ExternalLink data-icon="inline-start" />
                   {submitting && pendingMethod === "URL"
-                    ? "正在领取…"
-                    : "使用链接领取"}
+                    ? `正在${actionNoun}…`
+                    : `使用链接${actionNoun}`}
                 </Button>
               ) : null}
               {hasCommand ? (
@@ -251,8 +255,8 @@ export function ClaimDrawer({
                 >
                   <Copy data-icon="inline-start" />
                   {submitting && pendingMethod === "COMMAND"
-                    ? "正在领取…"
-                    : "使用口令领取"}
+                    ? `正在${actionNoun}…`
+                    : `使用口令${actionNoun}`}
                 </Button>
               ) : null}
             </>

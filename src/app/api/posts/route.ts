@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { hashVisitorId } from "@/features/posts/device/hash";
+import { toPublicDeviceId } from "@/features/posts/device/public-id";
 import { DomainError } from "@/features/posts/domain/errors";
 import {
   assertPostTypeMatches,
@@ -191,6 +192,7 @@ function toHallPostDto(post: StoredPost): HallPostDto {
   return {
     id: post.id,
     type: post.type,
+    publisherId: toPublicDeviceId(post.publisherDeviceHash),
     discount: post.discount,
     pieceNumber: post.pieceNumber,
     availablePayloadKinds: post.availablePayloadKinds,

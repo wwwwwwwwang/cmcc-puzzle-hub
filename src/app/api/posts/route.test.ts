@@ -7,8 +7,10 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/features/posts/device/hash", () => ({
-  hashVisitorId: vi.fn(() => "device-hash"),
+  hashVisitorId: vi.fn(() => "0123456789abcdef".repeat(4)),
 }));
+
+vi.mock("server-only", () => ({}));
 
 const { publishPost, listPosts, checkPublishRateLimit } = vi.hoisted(() => ({
   publishPost: vi.fn(),
@@ -54,7 +56,7 @@ describe("/api/posts", () => {
         pieceNumber: 6,
         availablePayloadKinds: ["COMMAND"],
         payloads: { command: "￥19uSvG￥" },
-        publisherDeviceHash: "device-hash",
+        publisherDeviceHash: "0123456789abcdef".repeat(4),
         payloadHashes: { command: "payload-hash" },
         createdAt: "2027-01-15T08:00:00.000Z",
         expiresAt: "2027-01-16T08:00:00.000Z",
@@ -112,11 +114,13 @@ describe("/api/posts", () => {
       request({ ...baseInput, type, selection, sources }),
     );
     expect(response.status).toBe(201);
-    await expect(response.json()).resolves.toHaveProperty("post");
+    await expect(response.json()).resolves.toMatchObject({
+      post: { publisherId: "U-0123456789ABCDEF" },
+    });
     const published = publishPost.mock.calls[0][0];
     expect(published).toMatchObject({ type, payloads });
     expect(Object.values(published.payloadHashes)[0]).toMatch(/^[0-9a-f]{64}$/);
-    expect(published.publisherDeviceHash).toBe("device-hash");
+    expect(published.publisherDeviceHash).toBe("0123456789abcdef".repeat(4));
   });
 
   it("口令拼图与选择不一致返回 400/SELECTION_MISMATCH", async () => {
@@ -210,6 +214,7 @@ describe("/api/posts", () => {
           discount: 80,
           pieceNumber: 9,
           availablePayloadKinds: ["COMMAND"],
+          publisherId: "U-0123456789ABCDEF",
           createdAt: "2027-01-15T08:00:00.000Z",
           expiresAt: "2027-01-16T08:00:00.000Z",
         },

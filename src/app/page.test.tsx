@@ -13,6 +13,10 @@ vi.mock("@/features/posts/components/post-filters", () => ({
   ),
 }));
 
+vi.mock("@/features/posts/components/current-user-badge", () => ({
+  CurrentUserBadge: () => <span>当前用户测试标识</span>,
+}));
+
 import Home from "./page";
 
 describe("Home", () => {

@@ -4,13 +4,24 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HallPostDto } from "@/features/posts/domain/types";
 import { PostCard } from "./post-card";
 
+const { identity } = vi.hoisted(() => ({
+  identity: {
+    status: "ready",
+    visitorId: "visitor-id-123",
+    publicId: "U-0123456789ABCDEF",
+    publicIdStatus: "ready",
+    retry: vi.fn(),
+  },
+}));
+
 vi.mock("@/features/posts/device/device-provider", () => ({
-  useDeviceIdentity: () => ({ status: "ready", visitorId: "visitor-id-123", retry: vi.fn() }),
+  useDeviceIdentity: () => identity,
 }));
 
 const post: HallPostDto = {
   id: "p_1800000000000_123e4567-e89b-42d3-a456-426614174000",
   type: "GIVE",
+  publisherId: "U-0123456789ABCDEF",
   discount: 80,
   pieceNumber: 6,
   availablePayloadKinds: ["COMMAND"],
@@ -34,7 +45,11 @@ describe("PostCard", () => {
     vi.setSystemTime(new Date("2026-01-01T00:02:00.000Z"));
     render(<PostCard post={{ ...post, availablePayloadKinds: [...availablePayloadKinds] }} />);
 
-    expect(screen.getByText(`${label} · 2分钟前`)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (content) => content.includes(label) && content.includes("2分钟前"),
+      ),
+    ).toBeInTheDocument();
   });
 
   it("显示参考稿标签、编号和获取按钮", () => {
@@ -44,9 +59,25 @@ describe("PostCard", () => {
 
     expect(screen.getByText("出/赠")).toBeInTheDocument();
     expect(screen.getByText("8折 · 第 6 号")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "一键获取" })).toHaveClass(
+    expect(screen.getByText(/发布者 U-0123456789ABCDEF（我）/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "获取拼图" })).toHaveClass(
       "bg-blue-600",
     );
+  });
+
+  it("求助帖子显示去助力", () => {
+    render(
+      <PostCard
+        post={{
+          ...post,
+          type: "REQUEST",
+          publisherId: "U-FEDCBA9876543210",
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/发布者 U-FEDCBA9876543210/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "去助力" })).toBeInTheDocument();
   });
 
   it("点击卡片领取按钮只打开确认抽屉，不请求 API", async () => {
@@ -54,7 +85,7 @@ describe("PostCard", () => {
     vi.stubGlobal("fetch", fetchSpy);
     render(<PostCard post={post} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "一键获取" }));
+    fireEvent.click(screen.getByRole("button", { name: "获取拼图" }));
 
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();

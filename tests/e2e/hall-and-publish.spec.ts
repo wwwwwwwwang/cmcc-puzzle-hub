@@ -8,9 +8,13 @@ import {
   REQUEST_COMMAND,
 } from "../fixtures/cmcc-samples";
 
+const CURRENT_PUBLIC_ID = "U-0123456789ABCDEF";
+const OTHER_PUBLIC_ID = "U-FEDCBA9876543210";
+
 const commandPost = {
   id: "p_1800000000000_123e4567-e89b-42d3-a456-426614174000",
   type: "GIVE",
+  publisherId: OTHER_PUBLIC_ID,
   discount: 80,
   pieceNumber: 6,
   availablePayloadKinds: ["COMMAND"],
@@ -22,6 +26,12 @@ const urlPost = { ...commandPost, availablePayloadKinds: ["URL"] };
 const dualPost = {
   ...commandPost,
   availablePayloadKinds: ["COMMAND", "URL"],
+};
+const selfRequestPost = {
+  ...commandPost,
+  id: "p_1800000000000_123e4567-e89b-42d3-a456-426614174001",
+  type: "REQUEST",
+  publisherId: CURRENT_PUBLIC_ID,
 };
 
 type ApiMockOptions = {
@@ -38,6 +48,10 @@ async function installApiMocks(
     publishBodies: [] as string[],
     listUrls: [] as string[],
   };
+
+  await page.route("**/api/identity", async (route) => {
+    await route.fulfill({ json: { publicId: CURRENT_PUBLIC_ID } });
+  });
 
   await page.route("**/api/posts**", async (route) => {
     const request = route.request();
@@ -117,10 +131,10 @@ test("仅口令发布和领取保持复制后唤起顺序", async ({ page }) => 
     sources: { command: GIVE_COMMAND },
   });
 
-  await page.getByRole("button", { name: "一键获取" }).click();
+  await page.getByRole("button", { name: "获取拼图" }).click();
   await page.getByRole("button", { name: "关闭领取弹窗" }).click();
   expect(calls.claim).toBe(0);
-  await page.getByRole("button", { name: "一键获取" }).click();
+  await page.getByRole("button", { name: "获取拼图" }).click();
   await page.getByRole("button", { name: "使用口令领取" }).click();
 
   await expect(page.getByText("若未自动跳转，请手动打开中国移动 APP")).toBeVisible();
@@ -161,7 +175,7 @@ test("仅二维码链接发布和领取不上传图片", async ({ page }) => {
   expect(calls.publishBodies[0]).not.toContain("multipart");
   expect(calls.publishBodies[0]).not.toContain("data:image");
 
-  await page.getByRole("button", { name: "一键获取" }).click();
+  await page.getByRole("button", { name: "获取拼图" }).click();
   await page.getByRole("button", { name: "使用链接领取" }).click();
   await page.waitForURL((url) => url.hostname === "h.app.coc.10086.cn");
   expect(calls.claim).toBe(1);
@@ -191,7 +205,7 @@ test("双来源复制失败后改用链接不会重复领取", async ({ page }) 
     (window as Window & { __clipboardShouldFail?: boolean }).__clipboardShouldFail = true;
   });
 
-  await page.getByRole("button", { name: "一键获取" }).click();
+  await page.getByRole("button", { name: "获取拼图" }).click();
   await expect(page.getByRole("button", { name: "使用口令领取" })).toBeVisible();
   await expect(page.getByRole("button", { name: "使用链接领取" })).toBeVisible();
   await page.getByRole("button", { name: "使用口令领取" }).click();
@@ -261,12 +275,29 @@ test("大厅按参考稿筛选折扣、类型和拼图编号", async ({ page }) 
   await expect(page.getByRole("radio")).toHaveCount(4);
 });
 
+test("大厅展示公开用户标识并为本人求助帖使用助力文案", async ({ page }) => {
+  await installApiMocks(page, {
+    post: selfRequestPost,
+    payloads: { command: REQUEST_COMMAND },
+  });
+  await page.goto("/");
+
+  await expect(page.getByText("当前用户", { exact: true })).toBeVisible();
+  await expect(page.locator("code")).toHaveText(CURRENT_PUBLIC_ID);
+  await expect(
+    page.getByText(`发布者 ${CURRENT_PUBLIC_ID}（我）`, { exact: false }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "去助力" }).click();
+  await expect(page.getByText("请选择助力方式")).toBeVisible();
+  await expect(page.getByRole("button", { name: "使用口令助力" })).toBeVisible();
+});
+
 test("大厅、领取抽屉和发布页无横向溢出", async ({ page }) => {
   await installApiMocks(page, { post: dualPost });
   await page.goto("/");
   await expect(page.getByText("最新发布")).toBeVisible();
   await expect(page.getByRole("button", { name: "刷新" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "一键获取" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "获取拼图" })).toBeVisible();
   await expect(page.getByRole("radiogroup", { name: "8折拼图选择" })).toHaveCSS(
     "width",
     "270px",
@@ -277,7 +308,7 @@ test("大厅、领取抽屉和发布页无横向溢出", async ({ page }) => {
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
     .toBe(true);
-  await page.getByRole("button", { name: "一键获取" }).click();
+  await page.getByRole("button", { name: "获取拼图" }).click();
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
     .toBe(true);

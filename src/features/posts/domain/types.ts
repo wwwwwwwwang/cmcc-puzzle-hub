@@ -35,12 +35,13 @@ export type ParsedSources = {
 export type HallPostDto = PuzzleSelection & {
   id: string;
   type: PostType;
+  publisherId: string;
   availablePayloadKinds: PayloadKind[];
   createdAt: string;
   expiresAt: string;
 };
 
-export type StoredPost = HallPostDto & {
+export type StoredPost = Omit<HallPostDto, "publisherId"> & {
   payloads: PostSources;
   payloadHashes: PayloadHashes;
   publisherDeviceHash: string;

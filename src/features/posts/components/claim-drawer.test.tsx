@@ -11,6 +11,8 @@ const GIVE_URL =
 const identity: DeviceIdentity = {
   status: "ready",
   visitorId: "visitor-id-123",
+  publicId: "U-0123456789ABCDEF",
+  publicIdStatus: "ready",
   retry: vi.fn(),
 };
 
@@ -21,6 +23,7 @@ vi.mock("@/features/posts/device/device-provider", () => ({
 const commandPost: HallPostDto = {
   id: "p_1800000000000_123e4567-e89b-42d3-a456-426614174000",
   type: "GIVE",
+  publisherId: "U-FEDCBA9876543210",
   discount: 80,
   pieceNumber: 6,
   availablePayloadKinds: ["COMMAND"],
@@ -110,6 +113,33 @@ describe("ClaimDrawer", () => {
     cleanup();
     renderDrawer({ ...commandPost, type: "REQUEST" });
     expect(screen.getByText("助力 8折 6 号拼图")).toBeInTheDocument();
+  });
+
+  it("求助帖子从说明到进行中状态均使用助力文案", async () => {
+    let resolveResponse!: (response: Response) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveResponse = resolve;
+          }),
+      ),
+    );
+    renderDrawer({ ...dualPost, type: "REQUEST" });
+
+    expect(screen.getByText("请选择助力方式")).toBeInTheDocument();
+    expect(screen.getByText("请选择更适合你的助力方式。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "使用链接助力" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "使用口令助力" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "使用链接助力" }));
+    expect(screen.getByRole("button", { name: "正在助力…" })).toBeInTheDocument();
+
+    resolveResponse(claimResponse({ url: GIVE_URL }));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "正在助力…" })).not.toBeInTheDocument(),
+    );
   });
 
   it("打开抽屉和关闭不会请求领取 API", () => {

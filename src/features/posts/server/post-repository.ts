@@ -6,6 +6,7 @@ import type {
   PostType,
   StoredPost,
 } from "../domain/types";
+import { toPublicDeviceId } from "../device/public-id";
 import {
   allIndexKey,
   claimKey,
@@ -348,6 +349,7 @@ function toHallPostDto(post: StoredPost): HallPostDto {
   return {
     id: post.id,
     type: post.type,
+    publisherId: toPublicDeviceId(post.publisherDeviceHash),
     discount: post.discount,
     pieceNumber: post.pieceNumber,
     availablePayloadKinds: post.availablePayloadKinds,

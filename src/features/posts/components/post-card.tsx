@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useDeviceIdentity } from "@/features/posts/device/device-provider";
 import type { HallPostDto } from "@/features/posts/domain/types";
 import { ClaimDrawer } from "./claim-drawer";
 import { formatRelativeTime } from "./relative-time";
@@ -13,6 +14,7 @@ type PostCardProps = {
 };
 
 export function PostCard({ post, onRemoved }: PostCardProps) {
+  const identity = useDeviceIdentity();
   const [open, setOpen] = useState(false);
   const claimedRef = useRef(false);
 
@@ -22,6 +24,9 @@ export function PostCard({ post, onRemoved }: PostCardProps) {
       : post.availablePayloadKinds[0] === "COMMAND"
         ? "仅有口令"
         : "仅有链接";
+  const isOwnPost =
+    identity.publicIdStatus === "ready" && identity.publicId === post.publisherId;
+  const metaLabel = `发布者 ${post.publisherId}${isOwnPost ? "（我）" : ""} · ${sourceLabel} · ${formatRelativeTime(post.createdAt)}`;
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
@@ -53,16 +58,20 @@ export function PostCard({ post, onRemoved }: PostCardProps) {
               {` · 第 ${post.pieceNumber} 号`}
             </span>
           </div>
-          <p className="truncate text-xs text-slate-500">
-            {sourceLabel} · {formatRelativeTime(post.createdAt)}
+          <p className="break-words text-xs leading-5 text-slate-500">
+            {metaLabel}
           </p>
         </div>
         <Button
           type="button"
           onClick={() => setOpen(true)}
-          className="shrink-0 rounded-full bg-blue-600 px-[18px] text-white shadow-[0_2px_4px_rgba(37,99,235,0.2)] hover:bg-blue-700"
+          className={`shrink-0 rounded-full px-[18px] text-white ${
+            post.type === "GIVE"
+              ? "bg-blue-600 shadow-[0_2px_4px_rgba(37,99,235,0.2)] hover:bg-blue-700"
+              : "bg-orange-500 shadow-[0_2px_4px_rgba(249,115,22,0.2)] hover:bg-orange-600"
+          }`}
         >
-          一键获取
+          {post.type === "GIVE" ? "获取拼图" : "去助力"}
         </Button>
       </div>
       {open ? (

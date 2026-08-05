@@ -21,7 +21,7 @@ const basePost: Omit<StoredPost, "id"> = {
     command: "secret-command",
     url: "https://h.app.coc.10086.cn/secret",
   },
-  publisherDeviceHash: "publisher-hash",
+  publisherDeviceHash: "0123456789abcdef".repeat(4),
   payloadHashes: {
     command: "command-hash",
     url: "url-hash",
@@ -75,7 +75,7 @@ describe("publishPost", () => {
     expect(JSON.parse(args[0])).toMatchObject({
       id: result.post.id,
       payloads: basePost.payloads,
-      publisherDeviceHash: "publisher-hash",
+      publisherDeviceHash: "0123456789abcdef".repeat(4),
       payloadHashes: basePost.payloadHashes,
     });
   });
@@ -122,6 +122,7 @@ describe("listPosts", () => {
         discount: 95,
         pieceNumber: 2,
         availablePayloadKinds: ["COMMAND", "URL"],
+        publisherId: "U-0123456789ABCDEF",
         createdAt: stored.createdAt,
         expiresAt: stored.expiresAt,
       },
@@ -139,7 +140,7 @@ describe("listPosts", () => {
       pieceNumber: 2,
       payloadKind: "COMMAND",
       payload: "secret-command",
-      publisherDeviceHash: "publisher-hash",
+      publisherDeviceHash: "0123456789abcdef".repeat(4),
       payloadHash: "legacy-hash",
       createdAt: basePost.createdAt,
       expiresAt: basePost.expiresAt,

@@ -13,6 +13,8 @@ const push = vi.fn();
 const identity: DeviceIdentity = {
   status: "ready",
   visitorId: "visitor-id-123",
+  publicId: "U-0123456789ABCDEF",
+  publicIdStatus: "ready",
   retry: vi.fn(),
 };
 
