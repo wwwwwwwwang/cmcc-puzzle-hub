@@ -1,5 +1,8 @@
+import { ShieldCheck } from "lucide-react";
 import { notFound } from "next/navigation";
 
+import { AccountSubpageHeader } from "@/features/account/components/account-subpage-header";
+import { EmptyState } from "@/features/account/components/empty-state";
 import { ReviewButtons } from "@/features/auth/components/review-buttons";
 import { isCurrentUserAdmin, listPendingUsers } from "@/features/auth/admin";
 
@@ -15,37 +18,37 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-6 px-4 py-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950">
-          用户审核
-        </h1>
-        <p className="text-sm text-slate-500">
-          核对用户名与微信群昵称一致后再通过。同一 IP 注册多个账号会标黄提示,请留意。
-        </p>
-      </header>
+      <AccountSubpageHeader
+        title="用户审核"
+        description="核对用户名与微信群昵称一致后再通过；同一 IP 注册多个账号会标黄提示。"
+      />
 
       {pending.length === 0 ? (
-        <p className="text-sm text-slate-400">暂无待审核用户。</p>
+        <EmptyState
+          icon={ShieldCheck}
+          title="暂无待审核用户"
+          description="新的注册申请会显示在这里。"
+        />
       ) : (
         <ul className="space-y-3">
           {pending.map((user) => (
             <li
               key={user.id}
-              className="space-y-2 rounded-lg border border-slate-100 px-3 py-2.5"
+              className="rounded-lg border border-slate-200 px-4 py-3"
             >
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0 space-y-0.5 text-sm">
-                  <p className="font-medium text-slate-900">
+              <div className="flex flex-col gap-3">
+                <div className="min-w-0 space-y-1">
+                  <p className="truncate text-sm font-semibold text-slate-900">
                     {user.username ?? "(未命名)"}
                   </p>
-                  <p className="text-xs text-slate-400">
-                    {user.registrationIp ?? "IP 未知"}
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                    <span>{user.registrationIp ?? "IP 未知"}</span>
                     {user.sameIpCount > 1 ? (
-                      <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-700">
+                      <span className="rounded-md bg-amber-100 px-1.5 py-0.5 font-medium text-amber-700">
                         同 IP {user.sameIpCount} 个账号
                       </span>
                     ) : null}
-                  </p>
+                  </div>
                 </div>
                 <ReviewButtons targetId={user.id} />
               </div>

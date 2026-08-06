@@ -22,7 +22,11 @@ export function ReviewButtons({ targetId }: { targetId: string }) {
   const message = approveState.error ?? rejectState.error;
 
   return (
-    <div className="flex items-center gap-2">
+    <div
+      role="group"
+      aria-label="审核操作"
+      className="flex flex-wrap items-center gap-2"
+    >
       <form action={approveAction}>
         <input type="hidden" name="targetId" value={targetId} />
         <Button type="submit" size="sm" disabled={approving}>
@@ -36,7 +40,7 @@ export function ReviewButtons({ targetId }: { targetId: string }) {
         </Button>
       </form>
       {message ? (
-        <span className="text-xs text-destructive">{message}</span>
+        <span className="basis-full text-xs text-destructive">{message}</span>
       ) : null}
     </div>
   );
