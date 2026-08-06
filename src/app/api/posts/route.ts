@@ -26,8 +26,8 @@ export async function GET(request: Request) {
   try {
     const page = await listPosts(parsed.filters);
     return Response.json(page);
-  } catch (error) {
-    logRouteError("SERVICE_UNAVAILABLE", error);
+  } catch {
+    logRouteError("SERVICE_UNAVAILABLE");
     return jsonError("SERVICE_UNAVAILABLE", 503);
   }
 }
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
     if (error instanceof DomainError) {
       return jsonError(error.code, 400);
     }
-    logRouteError("SERVICE_UNAVAILABLE", error);
+    logRouteError("SERVICE_UNAVAILABLE");
     return jsonError("SERVICE_UNAVAILABLE", 503);
   }
 }
@@ -180,10 +180,8 @@ function isValidCursor(value: string) {
   }
 }
 
-function logRouteError(code: string, error?: unknown) {
-  // 真实错误只进服务端日志(便于定位),不进响应体。
-  const detail = error instanceof Error ? error.message : String(error ?? "");
-  console.error(JSON.stringify({ code, requestId: randomUUID(), detail }));
+function logRouteError(code: string) {
+  console.error(JSON.stringify({ code, requestId: randomUUID() }));
 }
 
 function jsonError(
