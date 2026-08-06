@@ -1,3 +1,7 @@
+import { Gift } from "lucide-react";
+
+import { AccountSubpageHeader } from "@/features/account/components/account-subpage-header";
+import { EmptyState } from "@/features/account/components/empty-state";
 import {
   discountLabel,
   postTypeLabel,
@@ -11,46 +15,48 @@ export default async function ClaimedPostsPage() {
 
   return (
     <div className="space-y-6 px-4 py-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950">
-          我领取的
-        </h1>
-        <p className="text-sm text-slate-500">
-          这里保留你领取成功的口令或链接,方便再次复制使用。
-        </p>
-      </header>
+      <AccountSubpageHeader
+        title="我领取的"
+        description="保留领取成功的口令或链接，方便再次查看和使用。"
+      />
 
       {posts.length === 0 ? (
-        <p className="text-sm text-slate-400">还没有领取过拼图。</p>
+        <EmptyState
+          icon={Gift}
+          title="还没有领取过拼图"
+          description="领取成功后，口令或链接会保留在这里。"
+        />
       ) : (
         <ul className="space-y-3">
           {posts.map((post) => (
             <li
               key={post.id}
-              className="space-y-2 rounded-lg border border-slate-100 px-3 py-2.5"
+              className="space-y-3 rounded-lg border border-slate-200 px-4 py-3"
             >
-              <p className="text-sm font-medium text-slate-900">
+              <p className="text-sm font-semibold text-slate-900">
                 {postTypeLabel(post.type)} · {discountLabel(post.discount)} · 第
                 {post.pieceNumber} 块
               </p>
               {post.payloads.command ? (
-                <p className="break-all text-sm text-slate-600">
-                  口令:
-                  <code className="ml-1 font-mono">{post.payloads.command}</code>
-                </p>
+                <div className="rounded-lg bg-slate-50 px-3 py-2.5">
+                  <p className="text-xs font-medium text-slate-500">口令</p>
+                  <code className="mt-1 block break-all font-mono text-sm text-slate-800">
+                    {post.payloads.command}
+                  </code>
+                </div>
               ) : null}
               {post.payloads.url ? (
-                <p className="break-all text-sm text-slate-600">
-                  链接:
+                <div className="rounded-lg bg-slate-50 px-3 py-2.5">
+                  <p className="text-xs font-medium text-slate-500">链接</p>
                   <a
                     href={post.payloads.url}
-                    className="ml-1 text-blue-600 hover:underline"
+                    className="mt-1 block break-all text-sm text-blue-600 hover:underline"
                     target="_blank"
                     rel="noreferrer"
                   >
                     {post.payloads.url}
                   </a>
-                </p>
+                </div>
               ) : null}
             </li>
           ))}
