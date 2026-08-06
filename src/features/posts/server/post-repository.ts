@@ -33,14 +33,42 @@ export type PublishPostArgs = {
 
 export type PublishPostResult =
   | { status: "CREATED"; post: HallPostDto }
-  | { status: "DUPLICATE_POST" };
+  | { status: "DUPLICATE_POST" }
+  | { status: "INSUFFICIENT_CREDITS" };
 
 export type ClaimPostResult =
   | { status: "CLAIMED"; payloads: PostSources; idempotent: boolean }
   | { status: "SELF_CLAIM_FORBIDDEN" }
   | { status: "ALREADY_CLAIMED" }
   | { status: "EXPIRED" }
-  | { status: "INSUFFICIENT_CREDITS" };
+  | { status: "INSUFFICIENT_CREDITS" }
+  | { status: "INVALID_POST_TYPE" };
+
+export type HelpRequestPostResult =
+  | {
+      status: "HELPED";
+      payloads: PostSources;
+      idempotent: boolean;
+      confirmationDeadline: string;
+    }
+  | { status: "SELF_HELP_FORBIDDEN" }
+  | { status: "ALREADY_HELPED" }
+  | { status: "HELP_RETRY_FORBIDDEN" }
+  | { status: "EXPIRED" }
+  | { status: "INVALID_POST_TYPE" };
+
+export type ResolveRequestHelpResult =
+  | { status: "COMPLETED"; confirmationMethod: "MANUAL" | "AUTO" }
+  | { status: "REOPENED" }
+  | { status: "EXPIRED" }
+  | { status: "FORBIDDEN" }
+  | { status: "NOT_PENDING" };
+
+export type MaintenanceResult = {
+  autoConfirmed: number;
+  requestRefunded: number;
+  giveExpired: number;
+};
 
 export type ListPostFilters = {
   type?: PostType;
@@ -79,6 +107,9 @@ export async function publishPost(
 
   const result = data as { status: string; post?: RawRpcPost };
   if (result.status === "DUPLICATE_POST") return { status: "DUPLICATE_POST" };
+  if (result.status === "INSUFFICIENT_CREDITS") {
+    return { status: "INSUFFICIENT_CREDITS" };
+  }
   if (result.status !== "CREATED" || !result.post) {
     throw new Error("publish_post 返回异常");
   }
@@ -115,6 +146,98 @@ export async function claimPost(
     };
   }
   return { status: result.status };
+}
+
+export async function helpRequestPost(
+  postId: string,
+  helperId: string,
+  options: RepositoryOptions = {},
+): Promise<HelpRequestPostResult> {
+  const client = getClient(options);
+  const { data, error } = await client.rpc("help_request_post", {
+    p_post_id: postId,
+    p_helper: helperId,
+  });
+  if (error) throw new Error(`help_request_post 调用失败: ${error.message}`);
+
+  const result = data as {
+    status: string;
+    payloads?: PostSources;
+    idempotent?: boolean;
+    confirmationDeadline?: string;
+  };
+  if (result.status === "HELPED") {
+    if (!result.payloads || !result.confirmationDeadline) {
+      throw new Error("help_request_post 返回异常");
+    }
+    return {
+      status: "HELPED",
+      payloads: result.payloads,
+      idempotent: Boolean(result.idempotent),
+      confirmationDeadline: result.confirmationDeadline,
+    };
+  }
+  if (isHelpFailureStatus(result.status)) return { status: result.status };
+  throw new Error("help_request_post 返回异常");
+}
+
+export async function resolveRequestHelp(
+  postId: string,
+  publisherId: string,
+  received: boolean,
+  options: RepositoryOptions = {},
+): Promise<ResolveRequestHelpResult> {
+  const client = getClient(options);
+  const { data, error } = await client.rpc("resolve_request_help", {
+    p_post_id: postId,
+    p_publisher: publisherId,
+    p_received: received,
+  });
+  if (error) throw new Error(`resolve_request_help 调用失败: ${error.message}`);
+
+  const result = data as { status: string; confirmationMethod?: "MANUAL" | "AUTO" };
+  if (result.status === "COMPLETED" && result.confirmationMethod) {
+    return { status: "COMPLETED", confirmationMethod: result.confirmationMethod };
+  }
+  if (isResolveStatus(result.status)) return { status: result.status };
+  throw new Error("resolve_request_help 返回异常");
+}
+
+export async function syncRequestMaintenance(
+  options: RepositoryOptions = {},
+): Promise<MaintenanceResult> {
+  const client = getClient(options);
+  const { data, error } = await client.rpc("sync_request_maintenance");
+  if (error) throw new Error(`sync_request_maintenance 调用失败: ${error.message}`);
+  const result = data as Partial<MaintenanceResult>;
+  if (
+    typeof result.autoConfirmed !== "number" ||
+    typeof result.requestRefunded !== "number" ||
+    typeof result.giveExpired !== "number"
+  ) {
+    throw new Error("sync_request_maintenance 返回异常");
+  }
+  return result as MaintenanceResult;
+}
+
+function isHelpFailureStatus(status: string): status is Exclude<
+  HelpRequestPostResult["status"],
+  "HELPED"
+> {
+  return [
+    "SELF_HELP_FORBIDDEN",
+    "ALREADY_HELPED",
+    "HELP_RETRY_FORBIDDEN",
+    "EXPIRED",
+    "INVALID_POST_TYPE",
+  ].includes(status);
+}
+
+function isResolveStatus(status: string): status is Exclude<
+  ResolveRequestHelpResult["status"],
+  "COMPLETED"
+> {
+  return ["REOPENED", "EXPIRED", "FORBIDDEN", "NOT_PENDING"].includes(status);
 }
 
 export async function delistPost(

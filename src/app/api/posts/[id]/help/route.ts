@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { claimPost } from "@/features/posts/server/post-repository";
+import { helpRequestPost } from "@/features/posts/server/post-repository";
 import { checkClaimRateLimit } from "@/features/posts/server/rate-limit";
 import { getApprovedUser } from "@/lib/supabase/server";
 
@@ -12,39 +12,36 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  if (!UUID_PATTERN.test(id)) {
-    return jsonError("INVALID_INPUT", 400);
-  }
+  if (!UUID_PATTERN.test(id)) return jsonError("INVALID_INPUT", 400);
 
   const user = await getApprovedUser();
   if (!user) return jsonError("UNAUTHENTICATED", 401);
 
-  const ip = clientIp(request);
-
   try {
-    const rate = await checkClaimRateLimit(user.id, ip);
+    const rate = await checkClaimRateLimit(user.id, clientIp(request));
     if (!rate.success) {
       const retryAfter = Math.max(1, Math.ceil((rate.reset - Date.now()) / 1000));
       return jsonError("RATE_LIMITED", 429, { "Retry-After": String(retryAfter) });
     }
 
-    // 领取人与发布者不同 IP/设备的判断由 DB 端结合封顶决定;此处始终允许赚取,
-    // 具体是否加分交给 claim_post 的当日封顶与类型判断。共享 IP 的粗判可后续增强。
-    const result = await claimPost(id, user.id, true);
+    const result = await helpRequestPost(id, user.id);
     switch (result.status) {
-      case "CLAIMED":
+      case "HELPED":
         return Response.json(
-          { payloads: result.payloads, idempotent: result.idempotent },
+          {
+            payloads: result.payloads,
+            idempotent: result.idempotent,
+            confirmationDeadline: result.confirmationDeadline,
+          },
           { headers: { "Cache-Control": "no-store" } },
         );
-      case "SELF_CLAIM_FORBIDDEN":
-        return jsonError("SELF_CLAIM_FORBIDDEN", 403);
-      case "ALREADY_CLAIMED":
-        return jsonError("ALREADY_CLAIMED", 409);
+      case "SELF_HELP_FORBIDDEN":
+        return jsonError("SELF_HELP_FORBIDDEN", 403);
+      case "ALREADY_HELPED":
+      case "HELP_RETRY_FORBIDDEN":
+        return jsonError(result.status, 409);
       case "EXPIRED":
         return jsonError("EXPIRED", 404);
-      case "INSUFFICIENT_CREDITS":
-        return jsonError("INSUFFICIENT_CREDITS", 402);
       case "INVALID_POST_TYPE":
         return jsonError("INVALID_POST_TYPE", 400);
     }

@@ -182,6 +182,22 @@ describe("/api/posts", () => {
     });
   });
 
+  it("求助发布信用不足返回 402", async () => {
+    publishPost.mockResolvedValue({ status: "INSUFFICIENT_CREDITS" });
+    const response = await POST(
+      request({
+        ...baseInput,
+        type: "REQUEST",
+        selection: { discount: 80, pieceNumber: 1 },
+        sources: { command: REQUEST_COMMAND },
+      }),
+    );
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "INSUFFICIENT_CREDITS" },
+    });
+  });
+
   it("超限返回 429/RATE_LIMITED", async () => {
     checkPublishRateLimit.mockResolvedValue({ success: false, reset: 1234 });
     const response = await POST(request(baseInput));

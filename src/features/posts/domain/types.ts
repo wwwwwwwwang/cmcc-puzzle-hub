@@ -1,5 +1,15 @@
 export type PostType = "GIVE" | "REQUEST";
 
+export type RequestPostStatus =
+  | "OPEN"
+  | "PENDING_CONFIRM"
+  | "COMPLETED"
+  | "EXPIRED";
+
+export type HelpAttemptStatus = "PENDING" | "REJECTED" | "COMPLETED";
+
+export type ConfirmationMethod = "MANUAL" | "AUTO";
+
 export type Discount = 95 | 90 | 80;
 
 export type PayloadKind = "COMMAND" | "URL";

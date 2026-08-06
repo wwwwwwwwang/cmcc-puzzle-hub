@@ -78,6 +78,9 @@ export async function POST(request: Request) {
     if (result.status === "DUPLICATE_POST") {
       return jsonError("DUPLICATE_POST", 409);
     }
+    if (result.status === "INSUFFICIENT_CREDITS") {
+      return jsonError("INSUFFICIENT_CREDITS", 402);
+    }
 
     return Response.json(
       { post: result.post },

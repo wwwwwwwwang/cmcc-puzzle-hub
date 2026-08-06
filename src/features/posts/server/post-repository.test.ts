@@ -8,8 +8,11 @@ vi.mock("@/lib/supabase/admin", () => ({
 import {
   claimPost,
   delistPost,
+  helpRequestPost,
   listPosts,
   publishPost,
+  resolveRequestHelp,
+  syncRequestMaintenance,
   type PublishPostArgs,
 } from "./post-repository";
 
@@ -74,6 +77,13 @@ describe("publishPost", () => {
     expect(result).toEqual({ status: "DUPLICATE_POST" });
   });
 
+  it("映射 INSUFFICIENT_CREDITS", async () => {
+    const { client } = createClient(() => ({ status: "INSUFFICIENT_CREDITS" }));
+    await expect(publishPost(baseArgs, { client })).resolves.toEqual({
+      status: "INSUFFICIENT_CREDITS",
+    });
+  });
+
   it("RPC error 抛出", async () => {
     const rpc = vi.fn(async () => ({ data: null, error: { message: "boom" } }));
     await expect(
@@ -102,10 +112,73 @@ describe("claimPost", () => {
     "ALREADY_CLAIMED",
     "EXPIRED",
     "INSUFFICIENT_CREDITS",
+    "INVALID_POST_TYPE",
   ] as const)("透传失败状态 %s", async (status) => {
     const { client } = createClient(() => ({ status }));
     const result = await claimPost("p1", "u1", true, { client });
     expect(result.status).toBe(status);
+  });
+});
+
+describe("request help", () => {
+  it("映射 HELPED 及确认截止时间", async () => {
+    const { client, rpc } = createClient(() => ({
+      status: "HELPED",
+      idempotent: false,
+      payloads: { command: "￥help￥" },
+      confirmationDeadline: "2026-08-07T00:00:00.000Z",
+    }));
+
+    await expect(helpRequestPost("p1", "u1", { client })).resolves.toEqual({
+      status: "HELPED",
+      idempotent: false,
+      payloads: { command: "￥help￥" },
+      confirmationDeadline: "2026-08-07T00:00:00.000Z",
+    });
+    expect(rpc).toHaveBeenCalledWith("help_request_post", {
+      p_post_id: "p1",
+      p_helper: "u1",
+    });
+  });
+
+  it.each([
+    "SELF_HELP_FORBIDDEN",
+    "ALREADY_HELPED",
+    "HELP_RETRY_FORBIDDEN",
+    "EXPIRED",
+    "INVALID_POST_TYPE",
+  ] as const)("映射助力失败状态 %s", async (status) => {
+    const { client } = createClient(() => ({ status }));
+    await expect(helpRequestPost("p1", "u1", { client })).resolves.toEqual({ status });
+  });
+
+  it("调用确认 RPC", async () => {
+    const { client, rpc } = createClient(() => ({
+      status: "COMPLETED",
+      confirmationMethod: "MANUAL",
+    }));
+    await expect(
+      resolveRequestHelp("p1", "publisher", true, { client }),
+    ).resolves.toEqual({ status: "COMPLETED", confirmationMethod: "MANUAL" });
+    expect(rpc).toHaveBeenCalledWith("resolve_request_help", {
+      p_post_id: "p1",
+      p_publisher: "publisher",
+      p_received: true,
+    });
+  });
+
+  it("调用维护 RPC", async () => {
+    const { client, rpc } = createClient(() => ({
+      autoConfirmed: 1,
+      requestRefunded: 2,
+      giveExpired: 3,
+    }));
+    await expect(syncRequestMaintenance({ client })).resolves.toEqual({
+      autoConfirmed: 1,
+      requestRefunded: 2,
+      giveExpired: 3,
+    });
+    expect(rpc).toHaveBeenCalledWith("sync_request_maintenance");
   });
 });
 
