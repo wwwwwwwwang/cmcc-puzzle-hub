@@ -2,8 +2,12 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { confirmReceived, reportNotReceived } = vi.hoisted(() => ({
-  confirmReceived: vi.fn(async (_state: unknown, _formData: FormData) => ({})),
-  reportNotReceived: vi.fn(async (_state: unknown, _formData: FormData) => ({})),
+  confirmReceived: vi
+    .fn<(...args: [unknown, FormData]) => Promise<Record<string, never>>>()
+    .mockResolvedValue({}),
+  reportNotReceived: vi
+    .fn<(...args: [unknown, FormData]) => Promise<Record<string, never>>>()
+    .mockResolvedValue({}),
 }));
 
 vi.mock("@/features/posts/server/actions", () => ({

@@ -2,10 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-function remainingUntil(deadline: string) {
-  return Math.max(0, Date.parse(deadline) - Date.now());
-}
-
 function formatDuration(remainingMs: number) {
   const totalSeconds = Math.ceil(remainingMs / 1000);
   const hours = Math.floor(totalSeconds / 3600);
@@ -17,15 +13,15 @@ function formatDuration(remainingMs: number) {
 }
 
 export function ConfirmationCountdown({ deadline }: { deadline: string }) {
-  const [remainingMs, setRemainingMs] = useState(() => remainingUntil(deadline));
+  const [now, setNow] = useState(() => Date.now());
+  const remainingMs = Math.max(0, Date.parse(deadline) - now);
 
   useEffect(() => {
-    setRemainingMs(remainingUntil(deadline));
     const timer = window.setInterval(() => {
-      setRemainingMs(remainingUntil(deadline));
+      setNow(Date.now());
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [deadline]);
+  }, []);
 
   return (
     <time

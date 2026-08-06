@@ -21,7 +21,7 @@ export function HelpedPayloadActions({
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function useCommand() {
+  async function handleCommand() {
     if (!payloads.command) return;
     setError(null);
     try {
@@ -34,7 +34,7 @@ export function HelpedPayloadActions({
     }
   }
 
-  function useUrl() {
+  function handleUrl() {
     if (!payloads.url) return;
     setError(null);
     try {
@@ -49,7 +49,7 @@ export function HelpedPayloadActions({
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
         {payloads.command ? (
-          <Button type="button" size="sm" onClick={() => void useCommand()}>
+          <Button type="button" size="sm" onClick={() => void handleCommand()}>
             <Copy data-icon="inline-start" />
             {error ? "重试复制" : "使用口令"}
           </Button>
@@ -59,7 +59,7 @@ export function HelpedPayloadActions({
             type="button"
             size="sm"
             variant={payloads.command ? "outline" : "default"}
-            onClick={useUrl}
+            onClick={handleUrl}
           >
             <ExternalLink data-icon="inline-start" />
             打开链接
