@@ -322,15 +322,14 @@ test("大厅按参考稿筛选折扣、类型和拼图编号", async ({ page }) 
   await expect(page.getByRole("radio")).toHaveCount(4);
 });
 
-test("大厅展示公开用户标识并为本人求助帖使用助力文案", async ({ page }) => {
+test("大厅隐藏账户标识并为本人求助帖使用助力文案", async ({ page }) => {
   await installApiMocks(page, {
     post: selfRequestPost,
     payloads: { command: REQUEST_COMMAND },
   });
   await page.goto("/");
 
-  await expect(page.getByText("当前用户", { exact: true })).toBeVisible();
-  await expect(page.locator("code")).toHaveText(CURRENT_PUBLIC_ID);
+  await expect(page.getByText("当前用户", { exact: true })).not.toBeVisible();
   await expect(
     page.getByText(`发布者 ${CURRENT_PUBLIC_ID}（我）`, { exact: false }),
   ).toBeVisible();
