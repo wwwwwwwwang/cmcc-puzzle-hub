@@ -19,7 +19,7 @@ export default async function RegisterPage({
         </h1>
         <p className="text-sm text-slate-500">
           用用户名注册后,请将微信群昵称改为与用户名一致,并 @管理员 审核。
-          审核通过即获得 1 点信用:发布的赠送被他人领取可 +1,领取一次消耗 1 点。
+          审核通过即获得 3 点信用:发布的赠送被他人领取可 +1,领取一次消耗 1 点。
         </p>
       </header>
 
