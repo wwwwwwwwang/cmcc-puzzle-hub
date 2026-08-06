@@ -22,6 +22,9 @@ vi.mock("@/features/posts/components/confirmation-countdown", () => ({
     <time>倒计时 {deadline}</time>
   ),
 }));
+vi.mock("@/features/posts/components/account-activity-refresh", () => ({
+  AccountActivityRefresh: () => <button>刷新状态</button>,
+}));
 
 import MyPostsPage from "./page";
 
@@ -88,6 +91,7 @@ describe("MyPostsPage", () => {
     expect(screen.getByText("24 小时后自动确认")).toBeInTheDocument();
     expect(screen.getByText(/倒计时 2026-08-07/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "确认已收到" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "刷新状态" })).toBeInTheDocument();
   });
 
   it.each([

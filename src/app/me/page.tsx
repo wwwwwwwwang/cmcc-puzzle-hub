@@ -1,5 +1,6 @@
 import {
   ChevronRight,
+  CircleHelp,
   ClipboardList,
   Gift,
   ShieldCheck,
@@ -8,7 +9,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { getCreditOverview } from "@/features/posts/server/user-queries";
+import {
+  getAccountActivity,
+  getCreditOverview,
+} from "@/features/posts/server/user-queries";
 import { getAuthSession } from "@/lib/supabase/server";
 
 // 依赖会话 Cookie,禁止静态预渲染。
@@ -19,11 +23,15 @@ const REASON_LABELS: Record<string, string> = {
   EARN_CLAIMED: "赠送被领取",
   SPEND_CLAIM: "领取消耗",
   REFUND: "退款",
+  ESCROW_REQUEST: "发布求助托管",
+  EARN_HELP_CONFIRMED: "帮助确认奖励",
+  REFUND_REQUEST: "求助信用退还",
 };
 
 export default async function MePage() {
-  const [overview, session] = await Promise.all([
+  const [overview, activity, session] = await Promise.all([
     getCreditOverview(),
+    getAccountActivity(),
     getAuthSession(),
   ]);
 
@@ -63,7 +71,7 @@ export default async function MePage() {
           </span>
         </div>
         <p className="mt-3 text-xs leading-5 text-blue-700">
-          领取一次消耗 1 点；发布的赠送被他人领取可获得 1 点。
+          领取赠送消耗 1 点；发布求助托管 1 点；帮助成功可获得 1 点。
         </p>
       </section>
 
@@ -73,6 +81,11 @@ export default async function MePage() {
           icon={ClipboardList}
           title="我的帖子"
           description="管理发布与状态"
+          badge={
+            activity && activity.pendingConfirmationCount > 0
+              ? `${activity.pendingConfirmationCount} 项待确认`
+              : undefined
+          }
         />
         <AccountLink
           href="/me/claimed"
@@ -80,9 +93,15 @@ export default async function MePage() {
           title="我领取的"
           description="查看口令与链接"
         />
+        <AccountLink
+          className={session.isAdmin ? "" : "col-span-2"}
+          href="/me/helped"
+          icon={CircleHelp}
+          title="我帮助的"
+          description="查看助力与确认"
+        />
         {session.isAdmin ? (
           <AccountLink
-            className="col-span-2"
             href="/admin"
             icon={ShieldCheck}
             title="用户审核"
@@ -131,12 +150,14 @@ function AccountLink({
   title,
   description,
   className = "",
+  badge,
 }: {
   href: string;
   icon: LucideIcon;
   title: string;
   description: string;
   className?: string;
+  badge?: string;
 }) {
   return (
     <Link
@@ -147,8 +168,13 @@ function AccountLink({
         <Icon aria-hidden="true" className="size-5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold text-slate-900">
-          {title}
+        <span className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-slate-900">
+          <span>{title}</span>
+          {badge ? (
+            <span className="rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-600">
+              {badge}
+            </span>
+          ) : null}
         </span>
         <span className="mt-0.5 block text-xs leading-5 text-slate-500">
           {description}

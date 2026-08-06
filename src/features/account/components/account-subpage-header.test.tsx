@@ -20,4 +20,16 @@ describe("AccountSubpageHeader", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("管理发布记录。")).toBeInTheDocument();
   });
+
+  it("传入 actions 时展示页头操作区", () => {
+    render(
+      <AccountSubpageHeader
+        title="我的帖子"
+        description="管理发布记录。"
+        actions={<button>刷新状态</button>}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "刷新状态" })).toBeInTheDocument();
+  });
 });

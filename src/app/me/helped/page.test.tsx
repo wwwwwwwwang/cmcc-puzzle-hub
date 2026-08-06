@@ -14,6 +14,9 @@ vi.mock("@/features/posts/components/helped-payload-actions", () => ({
     <button>使用 {payloads.command}</button>
   ),
 }));
+vi.mock("@/features/posts/components/account-activity-refresh", () => ({
+  AccountActivityRefresh: () => <button>刷新状态</button>,
+}));
 
 import HelpedPostsPage from "./page";
 
@@ -72,6 +75,7 @@ describe("HelpedPostsPage", () => {
     expect(screen.getByText("对方已自动确认收到")).toBeInTheDocument();
     expect(screen.getByText("对方未收到，本次助力未完成")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "使用 拒绝口令" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "刷新状态" })).toBeInTheDocument();
     expect(screen.queryByText("再次助力")).not.toBeInTheDocument();
   });
 });

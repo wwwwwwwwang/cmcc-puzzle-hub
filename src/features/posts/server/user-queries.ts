@@ -57,6 +57,12 @@ export type CreditOverview = {
   ledger: CreditLedgerEntry[];
 };
 
+export type AccountActivity = {
+  pendingConfirmationCount: number;
+  pendingHelpCount: number;
+  version: string;
+};
+
 type PostRow = {
   id: string;
   type: PostType;
@@ -195,6 +201,71 @@ export async function getMyHelpedPosts(): Promise<MyHelpedPost[]> {
       resolvedAt: row.resolved_at,
     };
   });
+}
+
+export async function getAccountActivity(): Promise<AccountActivity | null> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const [confirmationResult, helpResult, postVersionResult, helpVersionResult] =
+    await Promise.all([
+      supabase
+        .from("posts")
+        .select("id", { count: "exact", head: true })
+        .eq("publisher_id", user.id)
+        .eq("status", "PENDING_CONFIRM"),
+      supabase
+        .from("request_help_attempts")
+        .select("id", { count: "exact", head: true })
+        .eq("helper_id", user.id)
+        .eq("status", "PENDING"),
+      supabase
+        .from("posts")
+        .select("updated_at")
+        .eq("publisher_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1),
+      supabase
+        .from("request_help_attempts")
+        .select("helped_at, resolved_at")
+        .eq("helper_id", user.id)
+        .order("resolved_at", { ascending: false, nullsFirst: false })
+        .limit(1),
+    ]);
+
+  const error =
+    confirmationResult.error ??
+    helpResult.error ??
+    postVersionResult.error ??
+    helpVersionResult.error;
+  if (error) throw new Error(`查询账户活动失败: ${error.message}`);
+
+  const postVersion = (postVersionResult.data?.[0] as
+    | { updated_at?: string }
+    | undefined)?.updated_at;
+  const helpVersionRow = helpVersionResult.data?.[0] as
+    | { helped_at?: string; resolved_at?: string | null }
+    | undefined;
+
+  return {
+    pendingConfirmationCount: confirmationResult.count ?? 0,
+    pendingHelpCount: helpResult.count ?? 0,
+    version: latestVersion([
+      postVersion,
+      helpVersionRow?.helped_at,
+      helpVersionRow?.resolved_at,
+    ]),
+  };
+}
+
+function latestVersion(values: (string | null | undefined)[]) {
+  return values.reduce<string>((latest, value) => {
+    if (!value) return latest;
+    return !latest || Date.parse(value) > Date.parse(latest) ? value : latest;
+  }, "0");
 }
 
 export async function getCreditOverview(): Promise<CreditOverview | null> {

@@ -2,6 +2,7 @@ import { CircleHelp } from "lucide-react";
 
 import { AccountSubpageHeader } from "@/features/account/components/account-subpage-header";
 import { EmptyState } from "@/features/account/components/empty-state";
+import { AccountActivityRefresh } from "@/features/posts/components/account-activity-refresh";
 import { ConfirmationCountdown } from "@/features/posts/components/confirmation-countdown";
 import { HelpedPayloadActions } from "@/features/posts/components/helped-payload-actions";
 import { discountLabel } from "@/features/posts/components/post-status-label";
@@ -12,12 +13,19 @@ export const dynamic = "force-dynamic";
 
 export default async function HelpedPostsPage() {
   const posts = await getMyHelpedPosts();
+  const pendingHelpCount = posts.filter((post) => post.status === "PENDING").length;
 
   return (
     <div className="space-y-6 px-4 py-6">
       <AccountSubpageHeader
         title="我帮助的"
         description="查看助力确认进度，并再次使用已提交的口令或链接。"
+        actions={
+          <AccountActivityRefresh
+            pendingKind="help"
+            initialPendingCount={pendingHelpCount}
+          />
+        }
       />
 
       {posts.length === 0 ? (

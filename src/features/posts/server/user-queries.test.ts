@@ -9,22 +9,27 @@ const { createSupabaseServerClient } = vi.hoisted(() => ({
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient }));
 
 import {
+  getAccountActivity,
   getMyClaimedPosts,
   getMyHelpedPosts,
   getMyPosts,
 } from "./user-queries";
 
-function createQuery(data: unknown[]) {
+function createQuery(data: unknown[], count: number | null = null) {
   const query = {
     select: vi.fn(),
     eq: vi.fn(),
     order: vi.fn(),
     limit: vi.fn(),
+    then: vi.fn(),
   };
   query.select.mockReturnValue(query);
   query.eq.mockReturnValue(query);
   query.order.mockReturnValue(query);
   query.limit.mockResolvedValue({ data, error: null });
+  query.then.mockImplementation((resolve) =>
+    Promise.resolve({ data, error: null, count }).then(resolve),
+  );
   return query;
 }
 
@@ -119,5 +124,33 @@ describe("账户帖子查询", () => {
     ]);
     expect(attempts.eq).toHaveBeenCalledWith("helper_id", "user-1");
     expect(attempts.order).toHaveBeenCalledWith("helped_at", { ascending: false });
+  });
+
+  it("账户活动汇总两个待处理数量和最新版本", async () => {
+    const confirmationCount = createQuery([], 2);
+    const helpCount = createQuery([], 1);
+    const postVersion = createQuery([
+      { updated_at: "2026-08-06T01:00:00.000Z" },
+    ]);
+    const helpVersion = createQuery([
+      {
+        helped_at: "2026-08-06T00:00:00.000Z",
+        resolved_at: "2026-08-06T02:00:00.000Z",
+      },
+    ]);
+    const queues = {
+      posts: [confirmationCount, postVersion],
+      request_help_attempts: [helpCount, helpVersion],
+    };
+    createSupabaseServerClient.mockResolvedValue({
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) },
+      from: vi.fn((table: keyof typeof queues) => queues[table].shift()),
+    });
+
+    await expect(getAccountActivity()).resolves.toEqual({
+      pendingConfirmationCount: 2,
+      pendingHelpCount: 1,
+      version: "2026-08-06T02:00:00.000Z",
+    });
   });
 });

@@ -2,6 +2,7 @@ import { ClipboardList } from "lucide-react";
 
 import { AccountSubpageHeader } from "@/features/account/components/account-subpage-header";
 import { EmptyState } from "@/features/account/components/empty-state";
+import { AccountActivityRefresh } from "@/features/posts/components/account-activity-refresh";
 import { ConfirmationCountdown } from "@/features/posts/components/confirmation-countdown";
 import { DelistButton } from "@/features/posts/components/delist-button";
 import {
@@ -17,12 +18,21 @@ export const dynamic = "force-dynamic";
 
 export default async function MyPostsPage() {
   const posts = await getMyPosts();
+  const pendingConfirmationCount = posts.filter(
+    (post) => post.type === "REQUEST" && post.status === "PENDING_CONFIRM",
+  ).length;
 
   return (
     <div className="space-y-6 px-4 py-6">
       <AccountSubpageHeader
         title="我的帖子"
         description="管理赠送和求助进度；开放中的帖子可以主动下架。"
+        actions={
+          <AccountActivityRefresh
+            pendingKind="confirmation"
+            initialPendingCount={pendingConfirmationCount}
+          />
+        }
       />
 
       {posts.length === 0 ? (
