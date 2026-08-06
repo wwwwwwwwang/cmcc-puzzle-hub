@@ -46,6 +46,7 @@ async function installApiMocks(
 ) {
   const calls = {
     claim: 0,
+    help: 0,
     publishBodies: [] as string[],
     listUrls: [] as string[],
   };
@@ -57,6 +58,18 @@ async function installApiMocks(
     if (pathname.endsWith("/claim")) {
       calls.claim += 1;
       await route.fulfill({ json: { payloads, idempotent: false } });
+      return;
+    }
+
+    if (pathname.endsWith("/help")) {
+      calls.help += 1;
+      await route.fulfill({
+        json: {
+          payloads,
+          idempotent: false,
+          confirmationDeadline: "2027-01-16T08:00:00.000Z",
+        },
+      });
       return;
     }
 
@@ -167,6 +180,7 @@ test("仅口令发布和领取保持复制后唤起顺序", async ({ page }) => 
       "launch:leadeon://",
     ]);
   expect(calls.claim).toBe(1);
+  expect(calls.help).toBe(0);
 });
 
 test("仅二维码链接发布和领取不上传图片", async ({ page }) => {
@@ -255,7 +269,14 @@ test("发布页要求先选类型并阻止类型冲突", async ({ page }) => {
 });
 
 test("求助内容按类型优先流程发布", async ({ page }) => {
-  const calls = await installApiMocks(page);
+  const requestPost = {
+    ...commandPost,
+    type: "REQUEST",
+  } as typeof commandPost;
+  const calls = await installApiMocks(page, {
+    post: requestPost,
+    payloads: { command: REQUEST_COMMAND },
+  });
   await page.goto("/publish");
 
   await page.getByRole("button", { name: "求助拼图" }).click();
@@ -269,6 +290,12 @@ test("求助内容按类型优先流程发布", async ({ page }) => {
     type: "REQUEST",
     sources: { command: REQUEST_COMMAND },
   });
+
+  await page.getByRole("button", { name: "去助力" }).click();
+  await page.getByRole("button", { name: "使用口令助力" }).click();
+  await expect(page.getByText("助力已提交，等待对方确认")).toBeVisible();
+  expect(calls.help).toBe(1);
+  expect(calls.claim).toBe(0);
 });
 
 test("大厅按参考稿筛选折扣、类型和拼图编号", async ({ page }) => {

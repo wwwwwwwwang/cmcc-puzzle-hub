@@ -40,6 +40,7 @@ const errorMessages: Record<string, string> = {
   INSUFFICIENT_CREDITS: "信用点不足，发布赠送被领取可获得信用",
   RATE_LIMITED: "操作过于频繁，请稍后再试",
   SERVICE_UNAVAILABLE: "服务暂时不可用，请稍后重试",
+  HELP_RETRY_FORBIDDEN: "你已助力过该求助，不能重复参与",
 };
 
 export function ClaimDrawer({
@@ -57,6 +58,7 @@ export function ClaimDrawer({
   const [error, setError] = useState<string | null>(null);
   const [claimedPayloads, setClaimedPayloads] = useState<PostSources | null>(null);
   const [commandReady, setCommandReady] = useState(false);
+  const [helpSubmitted, setHelpSubmitted] = useState(false);
   const submittingRef = useRef(false);
   const actionNoun = post.type === "GIVE" ? "领取" : "助力";
 
@@ -117,7 +119,8 @@ export function ClaimDrawer({
     setError(null);
 
     try {
-      const response = await fetch(`/api/posts/${post.id}/claim`, {
+      const endpoint = post.type === "GIVE" ? "claim" : "help";
+      const response = await fetch(`/api/posts/${post.id}/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
@@ -129,13 +132,13 @@ export function ClaimDrawer({
 
       if (!response.ok) {
         const code = await readErrorCode(response);
-        if (code === "ALREADY_CLAIMED") {
+        if (code === "ALREADY_CLAIMED" || code === "ALREADY_HELPED") {
           onClaimed(post.id);
           onOpenChange(false);
           return;
         }
         setError(
-          code === "SELF_CLAIM_FORBIDDEN"
+          code === "SELF_CLAIM_FORBIDDEN" || code === "SELF_HELP_FORBIDDEN"
             ? `不能${actionNoun}自己发布的内容`
             : (errorMessages[code] ?? `${actionNoun}失败，请稍后重试`),
         );
@@ -149,6 +152,7 @@ export function ClaimDrawer({
       }
 
       setClaimedPayloads(result.payloads);
+      if (post.type === "REQUEST") setHelpSubmitted(true);
       onClaimed(post.id);
       await executeClaimMethod(method, result.payloads);
     } catch {
@@ -209,6 +213,11 @@ export function ClaimDrawer({
                 </code>
               ) : null}
             </div>
+          ) : null}
+          {helpSubmitted ? (
+            <p role="status" className="text-sm font-medium text-emerald-700">
+              助力已提交，等待对方确认
+            </p>
           ) : null}
           {commandReady ? (
             <div className="space-y-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">

@@ -42,6 +42,20 @@ function claimResponse(payloads: { command?: string; url?: string }) {
   });
 }
 
+function helpResponse(payloads: { command?: string; url?: string }) {
+  return new Response(
+    JSON.stringify({
+      payloads,
+      idempotent: false,
+      confirmationDeadline: "2026-08-07T00:00:00.000Z",
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+}
+
 function renderDrawer(
   post: HallPostDto = commandPost,
   overrides: Partial<React.ComponentProps<typeof ClaimDrawer>> = {},
@@ -133,11 +147,16 @@ describe("ClaimDrawer", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "使用链接助力" }));
     expect(screen.getByRole("button", { name: "正在助力…" })).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(
+      `/api/posts/${dualPost.id}/help`,
+      expect.objectContaining({ method: "POST" }),
+    );
 
-    resolveResponse(claimResponse({ url: GIVE_URL }));
+    resolveResponse(helpResponse({ url: GIVE_URL }));
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "正在助力…" })).not.toBeInTheDocument(),
     );
+    expect(screen.getByText("助力已提交，等待对方确认")).toBeInTheDocument();
   });
 
   it("打开抽屉和关闭不会请求领取 API", () => {
