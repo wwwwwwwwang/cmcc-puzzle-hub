@@ -13,10 +13,6 @@ vi.mock("@/features/posts/components/post-filters", () => ({
   ),
 }));
 
-vi.mock("@/features/posts/components/current-user-badge", () => ({
-  CurrentUserBadge: () => <span>当前用户测试标识</span>,
-}));
-
 import Home from "./page";
 
 describe("Home", () => {
@@ -35,6 +31,9 @@ describe("Home", () => {
         name: "周三充值日拼图互助",
       }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "登录 / 注册" }),
+    ).not.toBeInTheDocument();
   });
 
   it("默认使用 8 折并传递拼图编号筛选", async () => {
