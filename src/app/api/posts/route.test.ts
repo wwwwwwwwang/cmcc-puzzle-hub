@@ -4,7 +4,7 @@ import {
   REQUEST_COMMAND,
   REQUEST_URL,
 } from "../../../../tests/fixtures/cmcc-samples";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -46,6 +46,10 @@ const baseInput = {
 };
 
 describe("/api/posts", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     getApprovedUser.mockResolvedValue({ id: USER_ID });
@@ -131,6 +135,20 @@ describe("/api/posts", () => {
     const published = publishPost.mock.calls[0][0];
     expect(published).toMatchObject({ type, payloads, publisherId: USER_ID });
     expect(published.payloadHashes[0]).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("按北京时间月底设置帖子过期时间", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-31T15:30:00.000Z"));
+
+    const response = await POST(request(baseInput));
+
+    expect(response.status).toBe(201);
+    expect(publishPost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expiresAt: "2026-08-31T16:00:00.000Z",
+      }),
+    );
   });
 
   it("口令拼图与选择不一致返回 400/SELECTION_MISMATCH", async () => {

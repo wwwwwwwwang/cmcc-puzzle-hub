@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { DomainError } from "@/features/posts/domain/errors";
+import { getPostExpiresAt } from "@/features/posts/domain/post-expiry";
 import {
   assertPostTypeMatches,
   parseSources,
@@ -15,8 +16,6 @@ import {
 } from "@/features/posts/server/post-repository";
 import { checkPublishRateLimit } from "@/features/posts/server/rate-limit";
 import { getApprovedUser } from "@/lib/supabase/server";
-
-const POST_TTL_MS = 86_400_000;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -60,7 +59,7 @@ export async function POST(request: Request) {
         : []),
       ...(parsedSources.sources.url ? [sha256(parsedSources.sources.url)] : []),
     ];
-    const expiresAt = new Date(Date.now() + POST_TTL_MS);
+    const expiresAt = getPostExpiresAt();
     const result = await publishPost({
       publisherId: user.id,
       type: parsedSources.type,
