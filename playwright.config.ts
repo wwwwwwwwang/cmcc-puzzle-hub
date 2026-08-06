@@ -1,17 +1,28 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const e2eBaseUrl = 'http://127.0.0.1:3100'
+const e2eAuthToken = process.env.E2E_TEST_AUTH_TOKEN
+
+if (!e2eAuthToken) {
+  throw new Error('请通过 pnpm test:e2e 运行 Playwright 测试')
+}
+
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 90_000,
   workers: 1,
   use: {
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: e2eBaseUrl,
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'pnpm dev',
-    url: 'http://127.0.0.1:3000',
-    reuseExistingServer: !process.env.CI,
+    command: 'pnpm dev --hostname 127.0.0.1 --port 3100',
+    url: e2eBaseUrl,
+    reuseExistingServer: false,
+    timeout: 180_000,
+    env: {
+      E2E_TEST_AUTH_TOKEN: e2eAuthToken,
+    },
   },
   projects: [
     {

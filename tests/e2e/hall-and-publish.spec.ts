@@ -7,6 +7,7 @@ import {
   GIVE_URL,
   REQUEST_COMMAND,
 } from "../fixtures/cmcc-samples";
+import { E2E_AUTH_COOKIE } from "../../src/lib/testing/e2e-auth";
 
 const CURRENT_PUBLIC_ID = "U-0123456789ABCDEF";
 const OTHER_PUBLIC_ID = "U-FEDCBA9876543210";
@@ -49,10 +50,6 @@ async function installApiMocks(
     listUrls: [] as string[],
   };
 
-  await page.route("**/api/identity", async (route) => {
-    await route.fulfill({ json: { publicId: CURRENT_PUBLIC_ID } });
-  });
-
   await page.route("**/api/posts**", async (route) => {
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
@@ -77,18 +74,38 @@ async function installApiMocks(
 }
 
 async function interceptCmccNavigation(page: Page) {
+  let receivedHeaders: Record<string, string> = {};
+
   await page.route("https://h.app.coc.10086.cn/**", async (route) => {
+    receivedHeaders = route.request().headers();
     await route.fulfill({
       status: 200,
       contentType: "text/html",
       body: "<!doctype html><title>CMCC</title>",
     });
   });
+
+  return () => receivedHeaders;
 }
 
-test.beforeEach(async ({ context }) => {
+test.beforeEach(async ({ context }, testInfo) => {
+  const baseUrl = testInfo.project.use.baseURL;
+  const authToken = process.env.E2E_TEST_AUTH_TOKEN;
+  if (typeof baseUrl !== "string" || typeof authToken !== "string") {
+    throw new Error("Playwright E2E 测试认证环境未初始化");
+  }
+
+  await context.addCookies([
+    {
+      name: E2E_AUTH_COOKIE,
+      value: authToken,
+      url: baseUrl,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+
   await context.addInitScript(() => {
-    localStorage.setItem("cmcc-puzzle-device-id", "e2e-device-id");
     const testWindow = window as Window & {
       __claimEvents?: string[];
       __clipboardShouldFail?: boolean;
@@ -157,7 +174,7 @@ test("仅二维码链接发布和领取不上传图片", async ({ page }) => {
     post: urlPost,
     payloads: { url: GIVE_URL },
   });
-  await interceptCmccNavigation(page);
+  const getCmccHeaders = await interceptCmccNavigation(page);
   await page.goto("/publish");
   await page.getByRole("button", { name: "赠送拼图" }).click();
   await page.getByRole("radio", { name: "8折6号拼图" }).click();
@@ -178,6 +195,9 @@ test("仅二维码链接发布和领取不上传图片", async ({ page }) => {
   await page.getByRole("button", { name: "获取拼图" }).click();
   await page.getByRole("button", { name: "使用链接领取" }).click();
   await page.waitForURL((url) => url.hostname === "h.app.coc.10086.cn");
+  const cmccHeaders = getCmccHeaders();
+  expect(cmccHeaders["x-e2e-auth-token"]).toBeUndefined();
+  expect(cmccHeaders.cookie ?? "").not.toContain(`${E2E_AUTH_COOKIE}=`);
   expect(calls.claim).toBe(1);
 });
 

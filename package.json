@@ -10,7 +10,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test:unit": "vitest run --exclude '**/*.integration.test.*' --exclude 'tests/e2e/**'",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/run-e2e.mjs",
     "test": "pnpm test:unit"
   },
   "dependencies": {

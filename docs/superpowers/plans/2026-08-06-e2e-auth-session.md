@@ -4,11 +4,22 @@
 
 **Goal:** 用非生产、密钥保护的测试会话替换已失效的 `/api/identity` E2E 身份模拟，恢复大厅、发布和领取完整 Playwright 流程。
 
-**Architecture:** 新增纯函数 `getE2eAuthSession()` 验证运行环境和请求头，在匹配时返回固定已审核普通用户会话。Next.js 根布局认证与 `proxy` 复用该函数；Playwright 配置向浏览器请求和测试开发服务器注入同一令牌，业务 API 仍使用现有路由模拟。
+**Architecture:** 新增纯函数 `getE2eAuthSession()` 验证运行环境和同源测试 Cookie，在匹配时返回固定已审核普通用户会话。父级 E2E 启动器每次生成随机令牌，Next.js 根布局认证与 `proxy` 读取同一 Cookie；业务 API 仍使用现有路由模拟。
 
 **Tech Stack:** Next.js 16.3 App Router、TypeScript、Vitest、Playwright、Supabase SSR
 
 ---
+
+## 执行中安全审查调整
+
+原计划中的全局 `x-e2e-auth-token` 请求头方案已被安全审查否决并由以下方案取代：
+
+- `scripts/run-e2e.mjs` 在父进程中每次生成 32 字节随机令牌，避免 Playwright 多进程重复加载配置时产生不同令牌。
+- `playwright.config.ts` 使用独立的 `127.0.0.1:3100`，禁用已有开发服务器复用，并把父进程令牌注入 Next.js webServer。
+- Playwright 只给应用同源写入 HttpOnly `cmcc-e2e-auth` Cookie；外部 CMCC 请求新增断言，确保不携带测试认证头或 Cookie。
+- `proxy.ts` 和 `getAuthSession()` 改用 Next.js Cookie API 读取测试令牌。
+
+下面原始任务中的请求头代码块保留为计划历史，执行结果以本节调整和最终代码为准。
 
 ### Task 1: 建立测试会话安全边界
 
@@ -136,7 +147,7 @@ Expected: 4 tests passed。
 
 - [ ] **Step 1: 运行现有快速失败 E2E，确认回归仍为 RED**
 
-Run: `pnpm exec playwright test tests/e2e/hall-and-publish.spec.ts --project="430x932" --grep "大厅展示公开用户标识"`
+Run: `pnpm test:e2e -- tests/e2e/hall-and-publish.spec.ts --project="430x932" --grep "大厅展示公开用户标识"`
 
 Expected: FAIL，`当前用户` 元素不存在。
 
@@ -220,13 +231,13 @@ await page.route("**/api/identity", async (route) => {
 
 - [ ] **Step 3: 运行聚焦 E2E 确认 GREEN**
 
-Run: `pnpm exec playwright test tests/e2e/hall-and-publish.spec.ts --project="430x932" --grep "大厅展示公开用户标识"`
+Run: `pnpm test:e2e -- tests/e2e/hall-and-publish.spec.ts --project="430x932" --grep "大厅展示公开用户标识"`
 
 Expected: 1 passed。
 
 - [ ] **Step 4: 运行单视口完整业务文件**
 
-Run: `pnpm exec playwright test tests/e2e/hall-and-publish.spec.ts --project="430x932"`
+Run: `pnpm test:e2e -- tests/e2e/hall-and-publish.spec.ts --project="430x932"`
 
 Expected: 8 passed。
 
@@ -266,6 +277,6 @@ Expected: no output，exit code 0。
 - [ ] **Step 3: 提交修复**
 
 ```bash
-git add playwright.config.ts tests/e2e/hall-and-publish.spec.ts src/lib/testing/e2e-auth.ts src/lib/testing/e2e-auth.test.ts src/lib/supabase/server.ts src/proxy.ts
+git add package.json scripts/run-e2e.mjs playwright.config.ts tests/e2e/hall-and-publish.spec.ts src/lib/testing/e2e-auth.ts src/lib/testing/e2e-auth.test.ts src/lib/supabase/server.ts src/proxy.ts docs/superpowers/specs/2026-08-06-e2e-auth-session-design.md docs/superpowers/plans/2026-08-06-e2e-auth-session.md
 git commit -m "test: 修复账号体系下的E2E认证"
 ```

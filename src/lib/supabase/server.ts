@@ -3,6 +3,11 @@ import "server-only";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
+import {
+  E2E_AUTH_COOKIE,
+  getE2eAuthSession,
+} from "@/lib/testing/e2e-auth";
+
 /**
  * 服务端 Supabase 客户端(anon key + 用户会话 Cookie)。
  * 用于 Server Components / Server Actions / Route Handlers 中读取当前登录用户,
@@ -70,6 +75,12 @@ const ANON_SESSION: SessionProfile = {
 };
 
 export async function getAuthSession(): Promise<SessionProfile> {
+  const cookieStore = await cookies();
+  const e2eSession = getE2eAuthSession(
+    cookieStore.get(E2E_AUTH_COOKIE)?.value,
+  );
+  if (e2eSession) return e2eSession;
+
   // 构建期(或未配置 Supabase)时降级为未登录,避免预渲染失败;
   // 运行期在 Vercel 上环境变量必然存在。
   if (

@@ -23,37 +23,43 @@
 
 ### 测试会话协议
 
-新增一个只在服务端使用的 E2E 认证辅助模块。模块接收请求头和运行环境，只有同时满足以下条件时才返回固定测试会话：
+新增一个只在服务端使用的 E2E 认证辅助模块。模块接收测试 Cookie 值和运行环境，只有同时满足以下条件时才返回固定测试会话：
 
 1. `NODE_ENV !== "production"`；
 2. 服务端存在非空 `E2E_TEST_AUTH_TOKEN`；
-3. 请求头 `x-e2e-auth-token` 与环境变量完全匹配。
+3. 同源 HttpOnly Cookie `cmcc-e2e-auth` 与环境变量完全匹配。
 
 返回的测试用户是已登录、已审核、非管理员用户，公开标识固定为现有 E2E 使用的 `U-0123456789ABCDEF`。任一条件不满足时返回 `null`，继续执行原 Supabase 认证流程。
 
 ### 请求数据流
 
-1. `playwright.config.ts` 为 Playwright 浏览器请求统一增加 `x-e2e-auth-token`。
-2. 同一配置把对应 `E2E_TEST_AUTH_TOKEN` 注入 Playwright 启动的 `pnpm dev` 进程。
-3. `proxy.ts` 在调用 Supabase 前读取测试会话；匹配时视为已认证，不把 `/publish` 重定向到登录页。
-4. `getAuthSession()` 在访问 Supabase 前读取测试会话；匹配时直接向根布局返回固定会话，使客户端显示发布按钮和“当前用户”。
-5. 普通开发服务器、构建、Vercel 和没有测试请求头的访问继续走原 Supabase 逻辑。
+1. `scripts/run-e2e.mjs` 每次运行生成新的 32 字节随机令牌，并通过环境变量传给 Playwright 进程。
+2. `playwright.config.ts` 在独立的 `127.0.0.1:3100` 启动 Next.js，把同一令牌作为 `E2E_TEST_AUTH_TOKEN` 注入服务器进程。
+3. Playwright `beforeEach` 为回环主机 `127.0.0.1` 写入 HttpOnly Cookie `cmcc-e2e-auth`；测试只访问该主机的 3100 端口和外部 CMCC 域名，Cookie 不会发送给 CMCC。
+4. `proxy.ts` 在调用 Supabase 前读取测试 Cookie；匹配时视为已认证，不把 `/publish` 重定向到登录页。
+5. `getAuthSession()` 在访问 Supabase 前读取测试 Cookie；匹配时直接向根布局返回固定会话，使客户端显示发布按钮和“当前用户”。
+6. 普通开发服务器、构建、Vercel 和没有正确测试 Cookie 的访问继续走原 Supabase 逻辑。
 
 ### 安全边界
 
 - 测试令牌是仅服务端环境变量，不使用 `NEXT_PUBLIC_` 前缀。
 - 生产环境硬性拒绝测试会话，即使误配令牌也不会启用。
-- 请求头本身不能单独开启测试身份，必须与服务器进程中的令牌匹配。
+- 令牌每次测试运行随机生成，测试服务器退出后不可复用。
+- 测试服务器仅绑定 `127.0.0.1:3100`，且不复用普通开发服务器。
+- 测试 Cookie 是 `127.0.0.1` 的 Host-only Cookie；Cookie 协议本身不按端口隔离，因此测试流程不得访问该主机上的其他端口。
+- 外部 CMCC 请求不携带测试 Cookie 或旧认证请求头，并由 E2E 断言锁定。
 - 辅助模块只返回最小公开会话信息，不包含邮箱、密码、访问令牌或真实用户 ID。
-- 不在日志、测试报告或错误信息中输出令牌。
+- 不在控制台日志或错误信息中主动输出令牌；失败 trace 即使记录同源 Cookie，其中令牌也只对已结束的单次测试服务器有效。
 
 ## 文件职责
 
-- `src/lib/testing/e2e-auth.ts`：纯函数形式验证环境、请求头和令牌，返回固定测试会话。
+- `src/lib/testing/e2e-auth.ts`：纯函数形式验证环境、Cookie 值和令牌，返回固定测试会话。
 - `src/lib/testing/e2e-auth.test.ts`：覆盖缺少令牌、错误令牌、生产环境和成功匹配。
 - `src/lib/supabase/server.ts`：在 `getAuthSession()` 的 Supabase 分支前读取 E2E 会话。
 - `src/proxy.ts`：在受保护路由判断前读取 E2E 会话；仅匹配时跳过未登录重定向。
-- `playwright.config.ts`：为测试浏览器和测试开发服务器配置同一令牌。
+- `scripts/run-e2e.mjs`：生成单次运行随机令牌并启动 Playwright。
+- `package.json`：让 `pnpm test:e2e` 使用统一启动器。
+- `playwright.config.ts`：启动独立回环地址测试服务器，并把令牌注入服务器进程。
 - `tests/e2e/hall-and-publish.spec.ts`：删除 `/api/identity` 模拟，保留帖子接口模拟和原业务断言。
 
 ## 测试策略
@@ -63,8 +69,8 @@
 先为 E2E 认证辅助模块编写失败测试，验证：
 
 - 未配置服务器令牌时返回 `null`；
-- 请求未携带令牌时返回 `null`；
-- 请求令牌不匹配时返回 `null`；
+- Cookie 未携带令牌时返回 `null`；
+- Cookie 令牌不匹配时返回 `null`；
 - `NODE_ENV` 为生产环境时返回 `null`；
 - 非生产环境且令牌匹配时返回固定的已审核普通用户会话。
 
@@ -88,7 +94,7 @@
 
 ## 错误处理
 
-- 测试配置缺失或请求头不匹配时不抛出认证错误，而是安全降级到原认证流程。
+- 测试配置缺失或 Cookie 不匹配时不抛出认证错误，而是安全降级到原认证流程。
 - CI 中若测试会话未生效，新增的快速冒烟断言应在短超时内直接指出认证失败，避免业务用例连续等待 90 秒。
 - Supabase 未配置时，普通游客行为保持现状。
 
@@ -96,7 +102,8 @@
 
 - 删除旧 `/api/identity` E2E 模拟。
 - 测试会话在生产环境不可启用。
-- 未携带正确请求头的本地访问不会获得测试身份。
+- 未携带正确测试 Cookie 的本地访问不会获得测试身份。
+- 外部 CMCC 请求不携带测试认证头或测试 Cookie。
 - E2E 中大厅显示固定当前用户，发布页显示发布按钮。
 - 完整 Playwright 结果不再出现原来的 `6 passed / 18 failed`。
 - 单元测试、类型检查、lint 和构建保持通过。
