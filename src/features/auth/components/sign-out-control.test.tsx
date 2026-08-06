@@ -37,4 +37,22 @@ describe("SignOutControl", () => {
 
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
   });
+
+  it("提交期间禁用确认按钮并显示进行中状态", async () => {
+    let resolveAction!: () => void;
+    const pendingSignOut = vi.fn(
+      () => new Promise<void>((resolve) => {
+        resolveAction = resolve;
+      }),
+    );
+    render(<SignOutControl action={pendingSignOut} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "退出登录" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认退出" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "退出中…" })).toBeDisabled();
+    });
+    resolveAction();
+  });
 });

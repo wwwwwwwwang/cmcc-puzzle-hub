@@ -13,9 +13,6 @@ vi.mock("@/features/posts/server/user-queries", () => ({
 }));
 vi.mock("@/lib/supabase/server", () => ({ getAuthSession }));
 vi.mock("@/features/auth/actions", () => ({ signOut: vi.fn() }));
-vi.mock("@/features/auth/components/sign-out-control", () => ({
-  SignOutControl: () => <button type="button">退出登录</button>,
-}));
 
 import MePage from "./page";
 
