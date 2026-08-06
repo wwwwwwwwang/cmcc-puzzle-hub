@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+import { signOut } from "@/features/auth/actions";
+import { SignOutControl } from "@/features/auth/components/sign-out-control";
 import {
   getAccountActivity,
   getCreditOverview,
@@ -140,6 +142,8 @@ export default async function MePage() {
           </ul>
         )}
       </section>
+
+      <SignOutControl action={signOut} />
     </div>
   );
 }

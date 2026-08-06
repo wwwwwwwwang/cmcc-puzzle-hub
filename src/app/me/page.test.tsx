@@ -12,6 +12,10 @@ vi.mock("@/features/posts/server/user-queries", () => ({
   getAccountActivity,
 }));
 vi.mock("@/lib/supabase/server", () => ({ getAuthSession }));
+vi.mock("@/features/auth/actions", () => ({ signOut: vi.fn() }));
+vi.mock("@/features/auth/components/sign-out-control", () => ({
+  SignOutControl: () => <button type="button">退出登录</button>,
+}));
 
 import MePage from "./page";
 
@@ -33,6 +37,7 @@ describe("MePage", () => {
 
     render(await MePage());
 
+    expect(screen.getByText("U-TEST")).toBeInTheDocument();
     expect(screen.getByLabelText("信用概览")).toHaveTextContent("2");
     expect(
       screen.getByRole("navigation", { name: "账户功能" }),
@@ -59,6 +64,9 @@ describe("MePage", () => {
     expect(
       screen.queryByRole("link", { name: /用户审核/ }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "退出登录" }),
+    ).toBeInTheDocument();
   });
 
   it("管理员额外显示用户审核入口", async () => {
