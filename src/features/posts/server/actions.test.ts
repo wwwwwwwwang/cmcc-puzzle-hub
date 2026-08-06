@@ -2,17 +2,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { getCurrentUser, delistPost, revalidatePath } = vi.hoisted(() => ({
+const { getCurrentUser, delistPost, resolveRequestHelp, revalidatePath } = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   delistPost: vi.fn(),
+  resolveRequestHelp: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({ getCurrentUser }));
-vi.mock("./post-repository", () => ({ delistPost }));
+vi.mock("./post-repository", () => ({ delistPost, resolveRequestHelp }));
 vi.mock("next/cache", () => ({ revalidatePath }));
 
-import { delistMyPost } from "./actions";
+import { confirmReceived, delistMyPost, reportNotReceived } from "./actions";
+
+const POST_ID = "123e4567-e89b-42d3-a456-426614174000";
 
 function form(fields: Record<string, string>) {
   const fd = new FormData();
@@ -51,5 +54,118 @@ describe("delistMyPost", () => {
     delistPost.mockResolvedValue({ status: "NOT_FOUND_OR_NOT_OPEN" });
     const state = await delistMyPost({}, form({ postId: "p1" }));
     expect(state.error).toBeTruthy();
+  });
+});
+
+describe("confirmReceived", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("未登录时拒绝确认", async () => {
+    getCurrentUser.mockResolvedValue(null);
+
+    await expect(confirmReceived({}, form({ postId: POST_ID }))).resolves.toEqual({
+      error: "请先登录",
+    });
+    expect(resolveRequestHelp).not.toHaveBeenCalled();
+  });
+
+  it("postId 不是 UUID 时拒绝确认", async () => {
+    getCurrentUser.mockResolvedValue({ id: "publisher" });
+
+    await expect(confirmReceived({}, form({ postId: "not-a-uuid" }))).resolves.toEqual({
+      error: "参数无效",
+    });
+    expect(resolveRequestHelp).not.toHaveBeenCalled();
+  });
+
+  it("确认收到后刷新三个账户路径", async () => {
+    getCurrentUser.mockResolvedValue({ id: "publisher" });
+    resolveRequestHelp.mockResolvedValue({
+      status: "COMPLETED",
+      confirmationMethod: "MANUAL",
+    });
+
+    await expect(confirmReceived({}, form({ postId: POST_ID }))).resolves.toEqual({
+      success: "已确认收到",
+    });
+    expect(resolveRequestHelp).toHaveBeenCalledWith(POST_ID, "publisher", true);
+    expect(revalidatePath).toHaveBeenCalledWith("/me");
+    expect(revalidatePath).toHaveBeenCalledWith("/me/posts");
+    expect(revalidatePath).toHaveBeenCalledWith("/me/helped");
+  });
+
+  it.each([
+    ["FORBIDDEN", "无权处理该求助"],
+    ["NOT_PENDING", "该求助已处理或无需确认"],
+  ])("将 %s 映射为可读错误", async (status, message) => {
+    getCurrentUser.mockResolvedValue({ id: "publisher" });
+    resolveRequestHelp.mockResolvedValue({ status });
+
+    await expect(confirmReceived({}, form({ postId: POST_ID }))).resolves.toEqual({
+      error: message,
+    });
+  });
+
+  it("服务异常时返回重试提示", async () => {
+    getCurrentUser.mockResolvedValue({ id: "publisher" });
+    resolveRequestHelp.mockRejectedValue(new Error("database unavailable"));
+
+    await expect(confirmReceived({}, form({ postId: POST_ID }))).resolves.toEqual({
+      error: "确认失败，请稍后重试",
+    });
+  });
+});
+
+describe("reportNotReceived", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("未登录或 postId 非法时不调用仓储", async () => {
+    getCurrentUser.mockResolvedValue(null);
+    await expect(reportNotReceived({}, form({ postId: POST_ID }))).resolves.toEqual({
+      error: "请先登录",
+    });
+
+    getCurrentUser.mockResolvedValue({ id: "publisher" });
+    await expect(reportNotReceived({}, form({ postId: "invalid" }))).resolves.toEqual({
+      error: "参数无效",
+    });
+    expect(resolveRequestHelp).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["REOPENED", "已反馈未收到，帖子已重新开放"],
+    ["EXPIRED", "已反馈未收到，帖子已过期并退还信用"],
+  ])("%s 后刷新三个账户路径", async (status, message) => {
+    getCurrentUser.mockResolvedValue({ id: "publisher" });
+    resolveRequestHelp.mockResolvedValue({ status });
+
+    await expect(reportNotReceived({}, form({ postId: POST_ID }))).resolves.toEqual({
+      success: message,
+    });
+    expect(resolveRequestHelp).toHaveBeenCalledWith(POST_ID, "publisher", false);
+    expect(revalidatePath).toHaveBeenCalledWith("/me");
+    expect(revalidatePath).toHaveBeenCalledWith("/me/posts");
+    expect(revalidatePath).toHaveBeenCalledWith("/me/helped");
+  });
+
+  it.each([
+    ["FORBIDDEN", "无权处理该求助"],
+    ["NOT_PENDING", "该求助已处理或无需确认"],
+  ])("将 %s 映射为可读错误", async (status, message) => {
+    getCurrentUser.mockResolvedValue({ id: "publisher" });
+    resolveRequestHelp.mockResolvedValue({ status });
+
+    await expect(reportNotReceived({}, form({ postId: POST_ID }))).resolves.toEqual({
+      error: message,
+    });
+  });
+
+  it("服务异常时返回重试提示", async () => {
+    getCurrentUser.mockResolvedValue({ id: "publisher" });
+    resolveRequestHelp.mockRejectedValue(new Error("database unavailable"));
+
+    await expect(reportNotReceived({}, form({ postId: POST_ID }))).resolves.toEqual({
+      error: "反馈失败，请稍后重试",
+    });
   });
 });
