@@ -96,6 +96,9 @@ describe("PuzzleBoard", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "9折" }));
     expect(screen.getAllByRole("radio", { name: /9折\d号拼图/ })).toHaveLength(6);
+    expect(screen.getByRole("radiogroup")).toHaveStyle({
+      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    });
   });
 
   it("使用 roving tabindex 且方向键循环移动选择和焦点", () => {

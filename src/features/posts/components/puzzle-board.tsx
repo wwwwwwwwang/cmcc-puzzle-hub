@@ -32,7 +32,7 @@ export function PuzzleBoard({
 }: PuzzleBoardProps) {
   const reduceMotion = useReducedMotion();
   const count = pieceCountByDiscount[discount];
-  const columns = discount === 95 ? 2 : 3;
+  const columns = discount === 80 ? 3 : 2;
   const previousDiscount = useRef(discount);
   const pieceRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
