@@ -1,6 +1,8 @@
 const STATUS_LABELS: Record<string, string> = {
   OPEN: "可领取",
   CLAIMED: "已领取",
+  PENDING_CONFIRM: "等待确认",
+  COMPLETED: "已完成",
   EXPIRED: "已过期",
 };
 
@@ -15,7 +17,8 @@ const DISCOUNT_LABELS: Record<number, string> = {
   80: "8 折",
 };
 
-export function postStatusLabel(status: string) {
+export function postStatusLabel(status: string, type?: string) {
+  if (type === "REQUEST" && status === "OPEN") return "等待助力";
   return STATUS_LABELS[status] ?? status;
 }
 
