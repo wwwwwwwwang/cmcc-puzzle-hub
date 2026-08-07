@@ -12,15 +12,13 @@ export type ConfirmationMethod = "MANUAL" | "AUTO";
 
 export type Discount = 95 | 90 | 80;
 
-export type PayloadKind = "COMMAND" | "URL";
+export type PayloadKind = "URL";
 
 export type PostSources = {
-  command?: string;
   url?: string;
 };
 
 export type PayloadHashes = {
-  command?: string;
   url?: string;
 };
 
@@ -33,15 +31,15 @@ export type ParsedSource = {
   type: PostType;
   payloadKind: PayloadKind;
   payload: string;
-  explicitSelection: PuzzleSelection | null;
-  identity: string | null;
+  explicitSelection: null;
+  identity: string;
 };
 
 export type ParsedSources = {
   type: PostType;
   sources: PostSources;
-  explicitSelection: PuzzleSelection | null;
-  identity: string | null;
+  explicitSelection: null;
+  identity: string;
 };
 
 export type HallPostDto = PuzzleSelection & {

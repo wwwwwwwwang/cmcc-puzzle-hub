@@ -50,7 +50,7 @@ describe("账户帖子查询", () => {
         type: "REQUEST",
         discount: 80,
         piece_number: 2,
-        available_payload_kinds: ["COMMAND"],
+        available_payload_kinds: ["URL"],
         status: "PENDING_CONFIRM",
         request_credit_status: "HELD",
         closure_reason: null,
@@ -102,7 +102,7 @@ describe("账户帖子查询", () => {
         posts: {
           discount: 90,
           piece_number: 5,
-          payloads: { command: "助力口令" },
+          payloads: { url: "https://h.app.coc.10086.cn/helped" },
         },
       },
     ]);
@@ -114,7 +114,7 @@ describe("账户帖子查询", () => {
         postId: "post-1",
         discount: 90,
         pieceNumber: 5,
-        payloads: { command: "助力口令" },
+        payloads: { url: "https://h.app.coc.10086.cn/helped" },
         status: "COMPLETED",
         confirmationDeadline: "2026-08-07T00:00:00.000Z",
         confirmationMethod: "AUTO",

@@ -53,7 +53,7 @@ describe("MePage", () => {
     );
     expect(screen.getByText("2 项待确认")).toBeInTheDocument();
     expect(screen.getByText("管理发布与状态")).toBeInTheDocument();
-    expect(screen.getByText("查看口令与链接")).toBeInTheDocument();
+    expect(screen.getByText("查看二维码链接")).toBeInTheDocument();
     expect(screen.getByText("查看助力与确认")).toBeInTheDocument();
     expect(screen.getByLabelText("信用概览")).toHaveTextContent(
       "发布求助托管 1 点",

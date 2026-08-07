@@ -32,7 +32,7 @@ export default function PublishPage() {
           分享或求助一块拼图
         </h1>
         <p className="text-sm text-slate-500">
-          先选择发布类型，再选择拼图并粘贴口令或识别二维码。
+          先选择发布类型，再选择拼图并识别二维码。
         </p>
       </header>
 

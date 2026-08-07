@@ -93,7 +93,7 @@ export default async function MePage() {
           href="/me/claimed"
           icon={Gift}
           title="我领取的"
-          description="查看口令与链接"
+          description="查看二维码链接"
         />
         <AccountLink
           className={session.isAdmin ? "" : "col-span-2"}

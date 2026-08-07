@@ -138,8 +138,8 @@ async function publishRequest(admin: SupabaseClient, publisherId: string) {
     p_type: "REQUEST",
     p_discount: 80,
     p_piece_number: 1,
-    p_payloads: { command: `￥${source}￥` },
-    p_kinds: ["COMMAND"],
+    p_payloads: { url: `https://h.app.coc.10086.cn/${source}` },
+    p_kinds: ["URL"],
     p_hashes: [source],
     p_expires_at: new Date(Date.now() + 86_400_000).toISOString(),
   });
