@@ -17,14 +17,14 @@ export default async function ClaimedPostsPage() {
     <div className="space-y-6 px-4 py-6">
       <AccountSubpageHeader
         title="我领取的"
-        description="保留领取成功的口令或链接，方便再次查看和使用。"
+        description="保留领取成功的二维码链接，方便再次查看和使用。"
       />
 
       {posts.length === 0 ? (
         <EmptyState
           icon={Gift}
           title="还没有领取过拼图"
-          description="领取成功后，口令或链接会保留在这里。"
+          description="领取成功后，二维码链接会保留在这里。"
         />
       ) : (
         <ul className="space-y-3">
@@ -37,17 +37,9 @@ export default async function ClaimedPostsPage() {
                 {postTypeLabel(post.type)} · {discountLabel(post.discount)} · 第
                 {post.pieceNumber} 块
               </p>
-              {post.payloads.command ? (
-                <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-                  <p className="text-xs font-medium text-slate-500">口令</p>
-                  <code className="mt-1 block break-all font-mono text-sm text-slate-800">
-                    {post.payloads.command}
-                  </code>
-                </div>
-              ) : null}
               {post.payloads.url ? (
                 <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-                  <p className="text-xs font-medium text-slate-500">链接</p>
+                  <p className="text-xs font-medium text-slate-500">二维码</p>
                   <a
                     href={post.payloads.url}
                     className="mt-1 block break-all text-sm text-blue-600 hover:underline"

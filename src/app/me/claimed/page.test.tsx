@@ -25,7 +25,7 @@ describe("ClaimedPostsPage", () => {
     );
   });
 
-  it("展示可换行的口令与外部链接", async () => {
+  it("展示二维码链接且不显示口令", async () => {
     getMyClaimedPosts.mockResolvedValue([
       {
         id: "claimed",
@@ -33,17 +33,16 @@ describe("ClaimedPostsPage", () => {
         discount: 80,
         pieceNumber: 3,
         payloads: {
-          command: "长口令内容",
-          url: "https://example.com/puzzle",
+          url: "https://h.app.coc.10086.cn/activity/zx/transit/transferDownload.html?targetUrl=https%3A%2F%2Fwx.10086.cn%2Fhlwyxhdhub%2Fact-wedrecharge%2F1024101716%3FgiveCard%3Dabc",
         },
       },
     ]);
 
     render(await ClaimedPostsPage());
 
-    expect(screen.getByText("长口令内容")).toBeInTheDocument();
+    expect(screen.queryByText("长口令内容")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "https://example.com/puzzle" }),
+      screen.getByRole("link", { name: /h\.app\.coc\.10086\.cn/ }),
     ).toHaveAttribute("target", "_blank");
   });
 });

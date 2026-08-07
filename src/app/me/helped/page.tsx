@@ -19,7 +19,7 @@ export default async function HelpedPostsPage() {
     <div className="space-y-6 px-4 py-6">
       <AccountSubpageHeader
         title="我帮助的"
-        description="查看助力确认进度，并再次使用已提交的口令或链接。"
+        description="查看助力确认进度，并再次打开已提交的二维码。"
         actions={
           <AccountActivityRefresh
             pendingKind="help"

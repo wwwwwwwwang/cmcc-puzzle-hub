@@ -18,12 +18,7 @@ export function PostCard({ post, onRemoved }: PostCardProps) {
   const [open, setOpen] = useState(false);
   const claimedRef = useRef(false);
 
-  const sourceLabel =
-    post.availablePayloadKinds.length === 2
-      ? "口令 + 链接"
-      : post.availablePayloadKinds[0] === "COMMAND"
-        ? "仅有口令"
-        : "仅有链接";
+  const sourceLabel = "二维码";
   const isOwnPost = publicId !== null && publicId === post.publisherId;
   const metaLabel = `发布者 ${post.publisherId}${isOwnPost ? "（我）" : ""} · ${sourceLabel} · ${formatRelativeTime(post.createdAt)}`;
 

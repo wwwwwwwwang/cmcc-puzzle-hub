@@ -22,7 +22,7 @@ const post: HallPostDto = {
   publisherId: "U-0123456789ABCDEF",
   discount: 80,
   pieceNumber: 6,
-  availablePayloadKinds: ["COMMAND"],
+  availablePayloadKinds: ["URL"],
   createdAt: "2026-01-01T00:00:00.000Z",
   expiresAt: "2026-01-02T00:00:00.000Z",
 };
@@ -34,18 +34,14 @@ describe("PostCard", () => {
     vi.useRealTimers();
   });
 
-  it.each([
-    [["COMMAND"] as const, "仅有口令"],
-    [["URL"] as const, "仅有链接"],
-    [["COMMAND", "URL"] as const, "口令 + 链接"],
-  ])("根据可用来源 %j 显示 %s", (availablePayloadKinds, label) => {
+  it("来源文案固定为二维码", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T00:02:00.000Z"));
-    render(<PostCard post={{ ...post, availablePayloadKinds: [...availablePayloadKinds] }} />);
+    render(<PostCard post={post} />);
 
     expect(
       screen.getByText(
-        (content) => content.includes(label) && content.includes("2分钟前"),
+        (content) => content.includes("二维码") && content.includes("2分钟前"),
       ),
     ).toBeInTheDocument();
   });

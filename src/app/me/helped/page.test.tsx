@@ -10,8 +10,8 @@ vi.mock("@/features/posts/components/confirmation-countdown", () => ({
   ),
 }));
 vi.mock("@/features/posts/components/helped-payload-actions", () => ({
-  HelpedPayloadActions: ({ payloads }: { payloads: { command?: string } }) => (
-    <button>使用 {payloads.command}</button>
+  HelpedPayloadActions: ({ payloads }: { payloads: { url?: string } }) => (
+    <button>打开二维码 {payloads.url}</button>
   ),
 }));
 vi.mock("@/features/posts/components/account-activity-refresh", () => ({
@@ -42,7 +42,7 @@ describe("HelpedPostsPage", () => {
         postId: "post-pending",
         discount: 80,
         pieceNumber: 1,
-        payloads: { command: "待确认口令" },
+        payloads: { url: "https://h.app.coc.10086.cn/pending" },
         status: "PENDING",
         confirmationDeadline: "2026-08-07T00:00:00.000Z",
         confirmationMethod: null,
@@ -52,7 +52,7 @@ describe("HelpedPostsPage", () => {
         postId: "post-completed",
         discount: 90,
         pieceNumber: 2,
-        payloads: { command: "完成口令" },
+        payloads: { url: "https://h.app.coc.10086.cn/completed" },
         status: "COMPLETED",
         confirmationDeadline: "2026-08-07T00:00:00.000Z",
         confirmationMethod: "AUTO",
@@ -62,7 +62,7 @@ describe("HelpedPostsPage", () => {
         postId: "post-rejected",
         discount: 95,
         pieceNumber: 3,
-        payloads: { command: "拒绝口令" },
+        payloads: { url: "https://h.app.coc.10086.cn/rejected" },
         status: "REJECTED",
         confirmationDeadline: "2026-08-07T00:00:00.000Z",
         confirmationMethod: null,
@@ -74,7 +74,7 @@ describe("HelpedPostsPage", () => {
     expect(screen.getByText("等待对方确认")).toBeInTheDocument();
     expect(screen.getByText("对方已自动确认收到")).toBeInTheDocument();
     expect(screen.getByText("对方未收到，本次助力未完成")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "使用 拒绝口令" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /打开二维码 https:\/\/h\.app/ })).toHaveLength(3);
     expect(screen.getByRole("button", { name: "刷新状态" })).toBeInTheDocument();
     expect(screen.queryByText("再次助力")).not.toBeInTheDocument();
   });

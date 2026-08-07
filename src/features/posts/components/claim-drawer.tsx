@@ -1,8 +1,8 @@
 "use client";
 
+import { ExternalLink, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { Copy, ExternalLink, Smartphone, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,23 +15,18 @@ import {
 } from "@/components/ui/drawer";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { parseUrl } from "@/features/posts/domain/parse-url";
-import type {
-  HallPostDto,
-  PayloadKind,
-  PostSources,
-} from "@/features/posts/domain/types";
+import type { HallPostDto, PostSources } from "@/features/posts/domain/types";
 
 type ClaimDrawerProps = {
   post: HallPostDto;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onClaimed: (postId: string) => void;
-  launchApp?: (url: string) => void;
   navigate?: (url: string) => void;
 };
 
 type ClaimSuccess = {
-  payloads: PostSources;
+  payloads: { url: string };
   idempotent: boolean;
 };
 
@@ -48,59 +43,35 @@ export function ClaimDrawer({
   open,
   onOpenChange,
   onClaimed,
-  launchApp = defaultLaunchApp,
   navigate = defaultNavigate,
 }: ClaimDrawerProps) {
   const router = useRouter();
   const { isAuthenticated } = useAuthSession();
   const [submitting, setSubmitting] = useState(false);
-  const [pendingMethod, setPendingMethod] = useState<PayloadKind | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [claimedPayloads, setClaimedPayloads] = useState<PostSources | null>(null);
-  const [commandReady, setCommandReady] = useState(false);
   const [helpSubmitted, setHelpSubmitted] = useState(false);
   const submittingRef = useRef(false);
   const actionNoun = post.type === "GIVE" ? "领取" : "助力";
 
-  async function executeClaimMethod(method: PayloadKind, payloads: PostSources) {
+  function executeUrl(payloads: PostSources) {
     setError(null);
-
-    if (method === "COMMAND") {
-      if (!payloads.command) {
-        setError(`${actionNoun}口令不可用，请尝试链接${actionNoun}`);
-        return;
-      }
-
-      try {
-        await navigator.clipboard.writeText(payloads.command);
-      } catch {
-        setCommandReady(false);
-        setError("复制失败，请允许剪贴板权限后重试");
-        return;
-      }
-
-      setCommandReady(true);
-      launchApp("leadeon://");
-      return;
-    }
-
     if (!payloads.url) {
-      setError(`${actionNoun}链接不可用，请尝试口令${actionNoun}`);
+      setError(`${actionNoun}链接不可用，请稍后重试`);
       return;
     }
 
     try {
       parseUrl(payloads.url);
+      navigate(payloads.url);
     } catch {
       setError(`${actionNoun}链接无效，请稍后重试`);
-      return;
     }
-    navigate(payloads.url);
   }
 
-  async function handleClaim(method: PayloadKind) {
+  async function handleClaim() {
     if (claimedPayloads) {
-      await executeClaimMethod(method, claimedPayloads);
+      executeUrl(claimedPayloads);
       return;
     }
 
@@ -109,13 +80,10 @@ export function ClaimDrawer({
       return;
     }
 
-    if (submittingRef.current) {
-      return;
-    }
+    if (submittingRef.current) return;
 
     submittingRef.current = true;
     setSubmitting(true);
-    setPendingMethod(method);
     setError(null);
 
     try {
@@ -154,18 +122,14 @@ export function ClaimDrawer({
       setClaimedPayloads(result.payloads);
       if (post.type === "REQUEST") setHelpSubmitted(true);
       onClaimed(post.id);
-      await executeClaimMethod(method, result.payloads);
+      executeUrl(result.payloads);
     } catch {
       setError("网络连接失败，请检查网络后重试");
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
-      setPendingMethod(null);
     }
   }
-
-  const hasCommand = post.availablePayloadKinds.includes("COMMAND");
-  const hasUrl = post.availablePayloadKinds.includes("URL");
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange} showSwipeHandle>
@@ -188,114 +152,43 @@ export function ClaimDrawer({
                 : "8折"}{" "}
             {post.pieceNumber} 号拼图
           </DrawerTitle>
-          <DrawerDescription>请选择{actionNoun}方式</DrawerDescription>
+          <DrawerDescription>
+            确认后将{actionNoun}并打开二维码链接
+          </DrawerDescription>
         </DrawerHeader>
 
         <div className="space-y-3 px-4 py-5">
-          <p className="text-sm text-slate-600">
-            {hasCommand && hasUrl
-              ? `请选择更适合你的${actionNoun}方式。`
-              : `确认后将${actionNoun}并打开对应内容。`}
-          </p>
           {!isAuthenticated ? (
             <p className="text-sm text-slate-500">
               {actionNoun}需要先登录,点击下方按钮将前往登录页。
             </p>
           ) : null}
           {error ? (
-            <div className="space-y-2">
-              <p role="alert" className="text-sm text-red-600">
-                {error}
-              </p>
-              {claimedPayloads?.command ? (
-                <code className="block break-all rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-800">
-                  {claimedPayloads.command}
-                </code>
-              ) : null}
-            </div>
+            <p role="alert" className="text-sm text-red-600">
+              {error}
+            </p>
           ) : null}
           {helpSubmitted ? (
             <p role="status" className="text-sm font-medium text-emerald-700">
               助力已提交，等待对方确认
             </p>
           ) : null}
-          {commandReady ? (
-            <div className="space-y-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
-              <p>口令已复制</p>
-              <p>若未自动跳转，请手动打开中国移动 APP</p>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => launchApp("leadeon://")}
-              >
-                <Smartphone data-icon="inline-start" />
-                再次唤起
-              </Button>
-            </div>
-          ) : null}
         </div>
 
         <DrawerFooter>
-          {!claimedPayloads ? (
-            <>
-              {hasUrl ? (
-                <Button
-                  type="button"
-                  className="h-12 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
-                  disabled={submitting}
-                  onClick={() => void handleClaim("URL")}
-                >
-                  <ExternalLink data-icon="inline-start" />
-                  {submitting && pendingMethod === "URL"
-                    ? `正在${actionNoun}…`
-                    : `使用链接${actionNoun}`}
-                </Button>
-              ) : null}
-              {hasCommand ? (
-                <Button
-                  type="button"
-                  className={`h-12 rounded-xl ${
-                    hasUrl
-                      ? ""
-                      : "bg-blue-600 text-white hover:bg-blue-700"
-                  }`}
-                  variant={hasUrl ? "secondary" : "default"}
-                  disabled={submitting}
-                  onClick={() => void handleClaim("COMMAND")}
-                >
-                  <Copy data-icon="inline-start" />
-                  {submitting && pendingMethod === "COMMAND"
-                    ? `正在${actionNoun}…`
-                    : `使用口令${actionNoun}`}
-                </Button>
-              ) : null}
-            </>
-          ) : !commandReady ? (
-            <>
-              {claimedPayloads.command ? (
-                <Button
-                  type="button"
-                  className="h-11"
-                  onClick={() => void handleClaim("COMMAND")}
-                >
-                  <Copy data-icon="inline-start" />
-                  复制口令
-                </Button>
-              ) : null}
-              {claimedPayloads.url ? (
-                <Button
-                  type="button"
-                  className="h-11"
-                  variant={claimedPayloads.command ? "outline" : "default"}
-                  onClick={() => void handleClaim("URL")}
-                >
-                  <ExternalLink data-icon="inline-start" />
-                  {claimedPayloads.command ? "改用链接" : "打开链接"}
-                </Button>
-              ) : null}
-            </>
-          ) : null}
+          <Button
+            type="button"
+            className="h-12 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+            disabled={submitting}
+            onClick={() => void handleClaim()}
+          >
+            <ExternalLink data-icon="inline-start" />
+            {submitting
+              ? `正在${actionNoun}…`
+              : claimedPayloads
+                ? "打开二维码"
+                : `使用链接${actionNoun}`}
+          </Button>
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
@@ -303,26 +196,22 @@ export function ClaimDrawer({
 }
 
 function readClaimSuccess(value: unknown): ClaimSuccess | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
+  if (!value || typeof value !== "object") return null;
   const candidate = value as Partial<ClaimSuccess>;
-  if (!candidate.payloads || typeof candidate.payloads !== "object") {
-    return null;
-  }
-
-  const command = candidate.payloads.command;
-  const url = candidate.payloads.url;
+  const payloads = candidate.payloads;
   if (
-    (command !== undefined && typeof command !== "string") ||
-    (url !== undefined && typeof url !== "string") ||
-    (command === undefined && url === undefined) ||
+    !payloads ||
+    typeof payloads !== "object" ||
+    typeof (payloads as { url?: unknown }).url !== "string" ||
     typeof candidate.idempotent !== "boolean"
   ) {
     return null;
   }
 
-  return { payloads: { command, url }, idempotent: candidate.idempotent };
+  return {
+    payloads: { url: (payloads as { url: string }).url },
+    idempotent: candidate.idempotent,
+  };
 }
 
 async function readErrorCode(response: Response) {
@@ -332,17 +221,6 @@ async function readErrorCode(response: Response) {
   } catch {
     return "";
   }
-}
-
-function defaultLaunchApp(url: string) {
-  const injected = (window as Window & {
-    __CMCC_LAUNCH_APP__?: (value: string) => void;
-  }).__CMCC_LAUNCH_APP__;
-  if (injected) {
-    injected(url);
-    return;
-  }
-  window.location.href = url;
 }
 
 function defaultNavigate(url: string) {
