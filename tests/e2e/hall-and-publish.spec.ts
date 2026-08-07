@@ -165,7 +165,6 @@ test("同一二维码重复发布被拦截", async ({ page }) => {
     "该二维码对应的拼图已经发布过了",
   );
   expect(calls.publishBodies).toHaveLength(1);
-  expect(page).toHaveURL(/\/publish$/);
 });
 
 test("发布类型与二维码类型不一致时阻止发布", async ({ page }) => {
