@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { getCurrentUser } from "@/lib/supabase/server";
+import { getApprovedUser, getCurrentUser } from "@/lib/supabase/server";
 import { delistPost, resolveRequestHelp } from "./post-repository";
 
 export type DelistState = { error?: string; success?: boolean };
@@ -36,8 +36,10 @@ export async function delistMyPost(
   _prevState: DelistState,
   formData: FormData,
 ): Promise<DelistState> {
-  const user = await getCurrentUser();
-  if (!user) return { error: "请先登录" };
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return { error: "请先登录" };
+  const user = await getApprovedUser();
+  if (!user) return { error: "请先审核通过后再操作" };
 
   const postId = formData.get("postId");
   if (typeof postId !== "string" || !postId) {
@@ -60,8 +62,10 @@ export async function confirmReceived(
   _prevState: RequestHelpActionState,
   formData: FormData,
 ): Promise<RequestHelpActionState> {
-  const user = await getCurrentUser();
-  if (!user) return { error: "请先登录" };
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return { error: "请先登录" };
+  const user = await getApprovedUser();
+  if (!user) return { error: "请先审核通过后再操作" };
 
   const postId = readPostId(formData);
   if (!postId) return { error: "参数无效" };
@@ -81,8 +85,10 @@ export async function reportNotReceived(
   _prevState: RequestHelpActionState,
   formData: FormData,
 ): Promise<RequestHelpActionState> {
-  const user = await getCurrentUser();
-  if (!user) return { error: "请先登录" };
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return { error: "请先登录" };
+  const user = await getApprovedUser();
+  if (!user) return { error: "请先审核通过后再操作" };
 
   const postId = readPostId(formData);
   if (!postId) return { error: "参数无效" };

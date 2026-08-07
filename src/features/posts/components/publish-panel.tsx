@@ -44,7 +44,7 @@ export function PublishPanel({
   decodeImage,
 }: PublishPanelProps) {
   const router = useRouter();
-  const { isAuthenticated } = useAuthSession();
+  const { isAuthenticated, isApproved } = useAuthSession();
   const [qrUrl, setQrUrl] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -76,7 +76,13 @@ export function PublishPanel({
     }
   }, [postType, selection, sources]);
   const canSubmit = Boolean(
-    postType && selection && sources.url && preview.parsed && isAuthenticated && !submitting,
+    postType &&
+    selection &&
+    sources.url &&
+    preview.parsed &&
+    isAuthenticated &&
+    isApproved &&
+    !submitting,
   );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -87,6 +93,7 @@ export function PublishPanel({
       !sources.url ||
       !preview.parsed ||
       !isAuthenticated ||
+      !isApproved ||
       submittingRef.current
     ) {
       return;
@@ -136,7 +143,7 @@ export function PublishPanel({
 
       <div className="space-y-3">
         <QrImagePicker
-          disabled={!postType || !selection || submitting}
+          disabled={!postType || !selection || !isApproved || submitting}
           decodeImage={decodeImage}
           onDecoded={(url) => {
             setQrUrl(url);
@@ -193,6 +200,10 @@ export function PublishPanel({
             去登录 / 注册
           </Link>
         </div>
+      ) : !isApproved ? (
+        <p className="rounded-lg bg-amber-50 px-3 py-3 text-sm text-amber-800">
+          账号待审核，当前仅可浏览；审核通过后才能发布。
+        </p>
       ) : (
         <Button type="submit" className="h-11 w-full" disabled={!canSubmit}>
           {submitting ? "正在发布…" : "发布"}

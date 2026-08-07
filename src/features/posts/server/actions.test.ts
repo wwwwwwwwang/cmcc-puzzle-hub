@@ -2,14 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { getCurrentUser, delistPost, resolveRequestHelp, revalidatePath } = vi.hoisted(() => ({
+const { getCurrentUser, getApprovedUser, delistPost, resolveRequestHelp, revalidatePath } = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
+  getApprovedUser: vi.fn(() => getCurrentUser()),
   delistPost: vi.fn(),
   resolveRequestHelp: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
-vi.mock("@/lib/supabase/server", () => ({ getCurrentUser }));
+vi.mock("@/lib/supabase/server", () => ({ getCurrentUser, getApprovedUser }));
 vi.mock("./post-repository", () => ({ delistPost, resolveRequestHelp }));
 vi.mock("next/cache", () => ({ revalidatePath }));
 
@@ -24,12 +25,23 @@ function form(fields: Record<string, string>) {
 }
 
 describe("delistMyPost", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getApprovedUser.mockImplementation(() => getCurrentUser());
+  });
 
   it("未登录返回错误,不调用仓储", async () => {
     getCurrentUser.mockResolvedValue(null);
     const state = await delistMyPost({}, form({ postId: "p1" }));
     expect(state.error).toBeTruthy();
+    expect(delistPost).not.toHaveBeenCalled();
+  });
+
+  it("待审核用户不能下架帖子", async () => {
+    getCurrentUser.mockResolvedValue({ id: "u1" });
+    getApprovedUser.mockResolvedValue(null);
+    const state = await delistMyPost({}, form({ postId: POST_ID }));
+    expect(state.error).toBe("请先审核通过后再操作");
     expect(delistPost).not.toHaveBeenCalled();
   });
 
@@ -58,13 +70,25 @@ describe("delistMyPost", () => {
 });
 
 describe("confirmReceived", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getApprovedUser.mockImplementation(() => getCurrentUser());
+  });
 
   it("未登录时拒绝确认", async () => {
     getCurrentUser.mockResolvedValue(null);
 
     await expect(confirmReceived({}, form({ postId: POST_ID }))).resolves.toEqual({
       error: "请先登录",
+    });
+    expect(resolveRequestHelp).not.toHaveBeenCalled();
+  });
+
+  it("待审核用户不能确认收到", async () => {
+    getCurrentUser.mockResolvedValue({ id: "u1" });
+    getApprovedUser.mockResolvedValue(null);
+    await expect(confirmReceived({}, form({ postId: POST_ID }))).resolves.toEqual({
+      error: "请先审核通过后再操作",
     });
     expect(resolveRequestHelp).not.toHaveBeenCalled();
   });
@@ -117,7 +141,10 @@ describe("confirmReceived", () => {
 });
 
 describe("reportNotReceived", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getApprovedUser.mockImplementation(() => getCurrentUser());
+  });
 
   it("未登录或 postId 非法时不调用仓储", async () => {
     getCurrentUser.mockResolvedValue(null);
@@ -128,6 +155,15 @@ describe("reportNotReceived", () => {
     getCurrentUser.mockResolvedValue({ id: "publisher" });
     await expect(reportNotReceived({}, form({ postId: "invalid" }))).resolves.toEqual({
       error: "参数无效",
+    });
+    expect(resolveRequestHelp).not.toHaveBeenCalled();
+  });
+
+  it("待审核用户不能反馈未收到", async () => {
+    getCurrentUser.mockResolvedValue({ id: "u1" });
+    getApprovedUser.mockResolvedValue(null);
+    await expect(reportNotReceived({}, form({ postId: POST_ID }))).resolves.toEqual({
+      error: "请先审核通过后再操作",
     });
     expect(resolveRequestHelp).not.toHaveBeenCalled();
   });

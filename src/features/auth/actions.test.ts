@@ -96,11 +96,20 @@ describe("signIn", () => {
     ).rejects.toThrow("REDIRECT:/me");
   });
 
-  it("待审核用户登录被登出并提示", async () => {
+  it("待审核用户保留登录会话并重定向", async () => {
     signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
     profileMaybeSingle.mockResolvedValue({ data: { status: "PENDING" } });
+    await expect(
+      signIn({}, form({ username: "alice", password: "password123", redirect: "/me" })),
+    ).rejects.toThrow("REDIRECT:/me");
+    expect(supabaseSignOut).not.toHaveBeenCalled();
+  });
+
+  it("用户档案查询失败时登出并提示暂时不可用", async () => {
+    signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    profileMaybeSingle.mockResolvedValue({ data: null, error: { message: "column missing" } });
     const state = await signIn({}, form({ username: "alice", password: "password123" }));
-    expect(state.error).toMatch(/待审核/);
+    expect(state.error).toBe("账号信息暂时不可用，请稍后重试");
     expect(supabaseSignOut).toHaveBeenCalled();
   });
 

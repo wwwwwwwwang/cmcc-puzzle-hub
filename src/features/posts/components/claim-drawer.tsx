@@ -46,7 +46,7 @@ export function ClaimDrawer({
   navigate = defaultNavigate,
 }: ClaimDrawerProps) {
   const router = useRouter();
-  const { isAuthenticated } = useAuthSession();
+  const { isAuthenticated, isApproved } = useAuthSession();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [claimedPayloads, setClaimedPayloads] = useState<PostSources | null>(null);
@@ -77,6 +77,11 @@ export function ClaimDrawer({
 
     if (!isAuthenticated) {
       router.push(`/login?redirect=/`);
+      return;
+    }
+
+    if (!isApproved) {
+      setError(`账号待审核，审核通过后才能${actionNoun}。`);
       return;
     }
 
@@ -163,6 +168,11 @@ export function ClaimDrawer({
               {actionNoun}需要先登录,点击下方按钮将前往登录页。
             </p>
           ) : null}
+          {isAuthenticated && !isApproved ? (
+            <p className="text-sm text-amber-700">
+              账号待审核，当前仅可浏览；审核通过后才能{actionNoun}。
+            </p>
+          ) : null}
           {error ? (
             <p role="alert" className="text-sm text-red-600">
               {error}
@@ -179,7 +189,7 @@ export function ClaimDrawer({
           <Button
             type="button"
             className="h-12 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
-            disabled={submitting}
+            disabled={submitting || (isAuthenticated && !isApproved)}
             onClick={() => void handleClaim()}
           >
             <ExternalLink data-icon="inline-start" />

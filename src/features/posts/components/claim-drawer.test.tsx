@@ -6,7 +6,11 @@ import type { HallPostDto } from "@/features/posts/domain/types";
 import { ClaimDrawer } from "./claim-drawer";
 
 const push = vi.fn();
-const authSession = { isAuthenticated: true, publicId: "U-0123456789ABCDEF" };
+const authSession = {
+  isAuthenticated: true,
+  isApproved: true,
+  publicId: "U-0123456789ABCDEF",
+};
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
@@ -61,6 +65,7 @@ describe("ClaimDrawer", () => {
     vi.unstubAllGlobals();
     push.mockReset();
     authSession.isAuthenticated = true;
+    authSession.isApproved = true;
   });
 
   it("只显示二维码链接领取动作，不显示口令入口", () => {
@@ -89,6 +94,15 @@ describe("ClaimDrawer", () => {
     fireEvent.click(screen.getByRole("button", { name: "使用链接领取" }));
     expect(push).toHaveBeenCalledWith("/login?redirect=/");
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("待审核用户显示只读提示并禁用领取", () => {
+    authSession.isApproved = false;
+    renderDrawer();
+
+    expect(screen.getByText("账号待审核，当前仅可浏览；审核通过后才能领取。"))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "使用链接领取" })).toBeDisabled();
   });
 
   it("成功领取后校验 URL 并导航，移除大厅卡片", async () => {

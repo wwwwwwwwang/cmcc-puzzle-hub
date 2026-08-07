@@ -67,19 +67,28 @@ export async function signIn(
   // 不区分「用户名不存在」与「密码错误」,避免用户名枚举。
   if (error || !data.user) return { error: "用户名或密码不正确" };
 
-  // 审核门控:未通过审核立即登出并提示。
-  const { data: profile } = await supabase
+  // 审核状态门控:待审核保留只读会话,拒绝或封禁立即登出。
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("status, rejection_reason")
     .eq("id", data.user.id)
     .single();
 
-  if (profile?.status !== "APPROVED") {
+  if (profileError || !profile) {
     await supabase.auth.signOut();
-    if (profile?.status === "BANNED") {
+    return { error: "账号信息暂时不可用，请稍后重试" };
+  }
+
+  if (profile.status === "PENDING") {
+    redirect(safeRedirect(formData.get("redirect")));
+  }
+
+  if (profile.status !== "APPROVED") {
+    await supabase.auth.signOut();
+    if (profile.status === "BANNED") {
       return { error: "该账号已被封禁,请联系管理员" };
     }
-    if (profile?.status === "REJECTED") {
+    if (profile.status === "REJECTED") {
       const reason =
         typeof profile.rejection_reason === "string"
           ? profile.rejection_reason.trim()

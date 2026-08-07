@@ -4,6 +4,7 @@ import { createContext, useContext, type ReactNode } from "react";
 
 export type AuthSession = {
   isAuthenticated: boolean;
+  isApproved: boolean;
   isAdmin: boolean;
   publicId: string | null;
 };

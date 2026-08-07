@@ -5,7 +5,11 @@ import { GIVE_URL, REQUEST_URL } from "../../../../tests/fixtures/cmcc-samples";
 import { PublishPanel } from "./publish-panel";
 
 const push = vi.fn();
-const authSession = { isAuthenticated: true, publicId: "U-0123456789ABCDEF" };
+const authSession = {
+  isAuthenticated: true,
+  isApproved: true,
+  publicId: "U-0123456789ABCDEF",
+};
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
@@ -42,6 +46,7 @@ describe("PublishPanel", () => {
     push.mockReset();
     vi.unstubAllGlobals();
     authSession.isAuthenticated = true;
+    authSession.isApproved = true;
   });
 
   it("只显示二维码来源并在无拼图选择时禁用上传", () => {
@@ -148,5 +153,15 @@ describe("PublishPanel", () => {
       "href",
       "/login?redirect=/publish",
     );
+  });
+
+  it("待审核用户显示只读提示并隐藏发布按钮", () => {
+    authSession.isApproved = false;
+    renderPanel();
+
+    expect(screen.queryByRole("button", { name: "发布" })).not.toBeInTheDocument();
+    expect(
+      screen.getByText("账号待审核，当前仅可浏览；审核通过后才能发布。"),
+    ).toBeInTheDocument();
   });
 });
