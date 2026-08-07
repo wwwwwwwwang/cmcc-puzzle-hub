@@ -106,8 +106,8 @@ export default async function MePage() {
           <AccountLink
             href="/admin"
             icon={ShieldCheck}
-            title="用户审核"
-            description="处理待审核用户"
+            title="用户管理"
+            description="管理账号与审核状态"
           />
         ) : null}
       </nav>

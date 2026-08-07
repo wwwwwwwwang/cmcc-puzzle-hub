@@ -104,6 +104,14 @@ describe("signIn", () => {
     expect(supabaseSignOut).toHaveBeenCalled();
   });
 
+  it("封禁用户登录被登出并提示封禁原因", async () => {
+    signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    profileMaybeSingle.mockResolvedValue({ data: { status: "BANNED" } });
+    const state = await signIn({}, form({ username: "alice", password: "password123" }));
+    expect(state.error).toMatch(/封禁/);
+    expect(supabaseSignOut).toHaveBeenCalled();
+  });
+
   it("拒绝开放重定向,回退首页", async () => {
     signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
     profileMaybeSingle.mockResolvedValue({ data: { status: "APPROVED" } });

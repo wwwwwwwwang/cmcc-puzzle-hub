@@ -76,6 +76,9 @@ export async function signIn(
 
   if (profile?.status !== "APPROVED") {
     await supabase.auth.signOut();
+    if (profile?.status === "BANNED") {
+      return { error: "该账号已被封禁,请联系管理员" };
+    }
     if (profile?.status === "REJECTED") {
       return { error: "该账号审核未通过,请联系管理员" };
     }

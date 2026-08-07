@@ -12,6 +12,22 @@ export type PendingUser = {
   createdAt: string;
 };
 
+export const USER_STATUSES = [
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+  "BANNED",
+] as const;
+
+export type UserStatus = (typeof USER_STATUSES)[number];
+export type UserStatusFilter = UserStatus | null;
+
+export type ManagedUser = PendingUser & {
+  credits: number;
+  status: UserStatus;
+  isAdmin: boolean;
+};
+
 /**
  * 当前会话是否为管理员。
  */
@@ -58,4 +74,47 @@ export async function listPendingUsers(): Promise<PendingUser[]> {
     sameIpCount: Number(row.same_ip_count),
     createdAt: row.created_at,
   }));
+}
+
+function isUserStatus(value: string | null | undefined): value is UserStatus {
+  return Boolean(value && USER_STATUSES.includes(value as UserStatus));
+}
+
+export async function listUsers(
+  status: UserStatusFilter = null,
+): Promise<ManagedUser[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin.rpc("list_users", {
+    p_admin: user.id,
+    p_status: isUserStatus(status) ? status : null,
+  });
+  if (error) throw new Error(`list_users 调用失败: ${error.message}`);
+
+  return ((data ?? []) as {
+    id: string;
+    username: string | null;
+    public_id: string;
+    credits: number;
+    status: string;
+    is_admin: boolean;
+    registration_ip: string | null;
+    same_ip_count: number;
+    created_at: string;
+  }[]).flatMap((row) => {
+    if (!isUserStatus(row.status)) return [];
+    return [{
+      id: row.id,
+      username: row.username,
+      publicId: row.public_id,
+      credits: Number(row.credits),
+      status: row.status,
+      isAdmin: Boolean(row.is_admin),
+      registrationIp: row.registration_ip,
+      sameIpCount: Number(row.same_ip_count),
+      createdAt: row.created_at,
+    }];
+  });
 }

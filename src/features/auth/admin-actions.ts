@@ -7,6 +7,15 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export type ReviewState = { error?: string; success?: string };
 
+function mapAdminStatus(status: string | undefined): ReviewState | null {
+  if (status === "FORBIDDEN") return { error: "无管理员权限" };
+  if (status === "SELF_FORBIDDEN") return { error: "不能封禁自己" };
+  if (status === "ADMIN_TARGET_FORBIDDEN") return { error: "不能操作管理员账号" };
+  if (status === "NOT_FOUND") return { error: "用户不存在" };
+  if (status === "INVALID_STATUS") return { error: "用户状态不允许此操作" };
+  return null;
+}
+
 async function review(
   formData: FormData,
   fn: "approve_user" | "reject_user",
@@ -29,14 +38,61 @@ async function review(
     if (error) throw new Error(error.message);
 
     const status = (data as { status?: string })?.status;
-    if (status === "FORBIDDEN") return { error: "无管理员权限" };
-    if (status === "NOT_FOUND") return { error: "用户不存在" };
+    const mapped = mapAdminStatus(status);
+    if (mapped) return mapped;
 
     revalidatePath("/admin");
+    revalidatePath("/");
+    revalidatePath("/me");
     return { success: okMessage };
   } catch {
     return { error: "操作失败,请稍后重试" };
   }
+}
+
+async function manageStatus(
+  formData: FormData,
+  fn: "ban_user" | "unban_user",
+  okMessage: string,
+): Promise<ReviewState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "请先登录" };
+
+  const targetId = formData.get("targetId");
+  if (typeof targetId !== "string" || !targetId) return { error: "参数无效" };
+
+  try {
+    const admin = createSupabaseAdminClient();
+    const { data, error } = await admin.rpc(fn, {
+      p_target: targetId,
+      p_admin: user.id,
+    });
+    if (error) throw new Error(error.message);
+
+    const mapped = mapAdminStatus((data as { status?: string })?.status);
+    if (mapped) return mapped;
+
+    revalidatePath("/admin");
+    revalidatePath("/");
+    revalidatePath("/me");
+    return { success: okMessage };
+  } catch {
+    return { error: "操作失败,请稍后重试" };
+  }
+}
+
+export async function banUser(
+  _prevState: ReviewState,
+  formData: FormData,
+): Promise<ReviewState> {
+  return manageStatus(formData, "ban_user", "已封禁");
+}
+
+export async function unbanUser(
+  _prevState: ReviewState,
+  formData: FormData,
+): Promise<ReviewState> {
+  return manageStatus(formData, "unban_user", "已解封");
 }
 
 export async function approveUser(

@@ -66,7 +66,7 @@ describe("MePage", () => {
     ).toBeInTheDocument();
   });
 
-  it("管理员额外显示用户审核入口", async () => {
+  it("管理员额外显示用户管理入口", async () => {
     getCreditOverview.mockResolvedValue({
       credits: 0,
       publicId: "U-ADMIN",
@@ -81,7 +81,7 @@ describe("MePage", () => {
 
     render(await MePage());
 
-    expect(screen.getByRole("link", { name: /用户审核/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /用户管理/ })).toHaveAttribute(
       "href",
       "/admin",
     );
