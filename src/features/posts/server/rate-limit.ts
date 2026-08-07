@@ -21,7 +21,7 @@ function positiveIntFromEnv(name: string, fallback: number) {
 
 export function createPublishRateLimiter(
   redis: Redis,
-  limit = positiveIntFromEnv("PUBLISH_LIMIT_PER_HOUR", 10),
+  limit = positiveIntFromEnv("PUBLISH_LIMIT_PER_HOUR", 30),
 ) {
   return new Ratelimit({
     redis,
@@ -32,7 +32,7 @@ export function createPublishRateLimiter(
 
 export function createDailyPublishRateLimiter(
   redis: Redis,
-  limit = positiveIntFromEnv("PUBLISH_LIMIT_PER_DAY", 10),
+  limit = positiveIntFromEnv("PUBLISH_LIMIT_PER_DAY", 30),
 ) {
   return new Ratelimit({
     redis,

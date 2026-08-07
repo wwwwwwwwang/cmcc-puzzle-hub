@@ -43,6 +43,11 @@ describe("rate limit 构造", () => {
     });
   });
 
+  it("每小时发布限流默认上限为 30", () => {
+    createPublishRateLimiter({} as never);
+    expect(slidingWindowSpy).toHaveBeenCalledWith(30, "1 h");
+  });
+
   it("每日发布限流用 1d 窗口与 rate:publish:day 前缀", () => {
     const redis = {};
     createDailyPublishRateLimiter(redis as never, 10);
@@ -52,6 +57,11 @@ describe("rate limit 构造", () => {
       limiter: "sliding-window",
       prefix: "rate:publish:day",
     });
+  });
+
+  it("每日发布限流默认上限为 30", () => {
+    createDailyPublishRateLimiter({} as never);
+    expect(slidingWindowSpy).toHaveBeenCalledWith(30, "1 d");
   });
 
   it("每日领取限流用 1d 窗口与 rate:claim:day 前缀", () => {
