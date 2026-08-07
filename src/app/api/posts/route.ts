@@ -53,22 +53,17 @@ export async function POST(request: Request) {
 
     const parsedSources = parseSources(input.sources, input.selection);
     assertPostTypeMatches(parsedSources.type, input.type);
-    const payloadHashes = [
-      ...(parsedSources.sources.command
-        ? [sha256(parsedSources.sources.command)]
-        : []),
-      ...(parsedSources.sources.url ? [sha256(parsedSources.sources.url)] : []),
-    ];
+    if (!parsedSources.identity || !parsedSources.sources.url) {
+      throw new DomainError("INVALID_CONTENT", "二维码内容无法识别");
+    }
+    const payloadHashes = [sha256(parsedSources.identity)];
     const expiresAt = getPostExpiresAt();
     const result = await publishPost({
       publisherId: user.id,
       type: parsedSources.type,
       discount: input.selection.discount,
       pieceNumber: input.selection.pieceNumber,
-      availablePayloadKinds: [
-        ...(parsedSources.sources.command ? (["COMMAND"] as const) : []),
-        ...(parsedSources.sources.url ? (["URL"] as const) : []),
-      ],
+      availablePayloadKinds: ["URL"],
       payloads: parsedSources.sources,
       payloadHashes,
       expiresAt: expiresAt.toISOString(),

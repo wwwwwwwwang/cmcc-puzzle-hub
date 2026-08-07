@@ -19,12 +19,9 @@ const selectionSchema = z
 
 const sourcesSchema = z
   .object({
-    command: z.string().trim().min(1).max(1000).optional(),
-    url: z.string().trim().min(1).max(4096).optional(),
+    url: z.string().trim().min(1).max(4096),
   })
-  .refine(({ command, url }) => command !== undefined || url !== undefined, {
-    message: "至少提供一种拼图来源",
-  });
+  .strict();
 
 export const createPostInputSchema = z.object({
   type: z.enum(["GIVE", "REQUEST"]),

@@ -4,7 +4,7 @@ import { createPostInputSchema } from "./schemas";
 
 const baseInput = {
   type: "GIVE" as const,
-  sources: { command: "￥19uSvG￥" },
+  sources: { url: "https://h.app.coc.10086.cn/example" },
 };
 
 describe("createPostInputSchema", () => {
@@ -40,7 +40,7 @@ describe("createPostInputSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("rejects input without a usable source", () => {
+  it("rejects input without a QR URL", () => {
     const result = createPostInputSchema.safeParse({
       ...baseInput,
       selection: { discount: 80, pieceNumber: 9 },
@@ -50,21 +50,30 @@ describe("createPostInputSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it.each([
-    { command: "￥19uSvG￥" },
-    { url: "https://h.app.coc.10086.cn/example" },
-    {
-      command: "￥19uSvG￥",
-      url: "https://h.app.coc.10086.cn/example",
-    },
-  ])("accepts one or two sources", (sources) => {
+  it("accepts a QR URL source", () => {
     const result = createPostInputSchema.safeParse({
       ...baseInput,
       selection: { discount: 80, pieceNumber: 9 },
-      sources,
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("rejects command-only and mixed sources", () => {
+    for (const sources of [
+      { command: "￥19uSvG￥" },
+      {
+        command: "￥19uSvG￥",
+        url: "https://h.app.coc.10086.cn/example",
+      },
+    ]) {
+      const result = createPostInputSchema.safeParse({
+        ...baseInput,
+        selection: { discount: 80, pieceNumber: 9 },
+        sources,
+      });
+      expect(result.success).toBe(false);
+    }
   });
 
   it("trims valid source values", () => {
@@ -72,14 +81,10 @@ describe("createPostInputSchema", () => {
       ...baseInput,
       selection: { discount: 80, pieceNumber: 9 },
       sources: {
-        command: "  ￥19uSvG￥  ",
         url: "  https://h.app.coc.10086.cn/example  ",
       },
     });
 
-    expect(result.sources).toEqual({
-      command: "￥19uSvG￥",
-      url: "https://h.app.coc.10086.cn/example",
-    });
+    expect(result.sources).toEqual({ url: "https://h.app.coc.10086.cn/example" });
   });
 });

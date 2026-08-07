@@ -1,9 +1,6 @@
-import {
-  GIVE_COMMAND,
-  GIVE_URL,
-  REQUEST_COMMAND,
-  REQUEST_URL,
-} from "../../../../tests/fixtures/cmcc-samples";
+import { createHash } from "node:crypto";
+
+import { GIVE_URL, REQUEST_URL } from "../../../../tests/fixtures/cmcc-samples";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -41,7 +38,7 @@ function request(body: unknown) {
 const baseInput = {
   type: "GIVE" as const,
   selection: { discount: 80, pieceNumber: 6 },
-  sources: { command: GIVE_COMMAND },
+  sources: { url: GIVE_URL },
   visitorId: "visitor-id-123",
 };
 
@@ -61,7 +58,7 @@ describe("/api/posts", () => {
         type: "GIVE",
         discount: 80,
         pieceNumber: 6,
-        availablePayloadKinds: ["COMMAND"],
+        availablePayloadKinds: ["URL"],
         publisherId: "U-0123456789ABCDEF",
         createdAt: "2027-01-15T08:00:00.000Z",
         expiresAt: "2027-01-16T08:00:00.000Z",
@@ -97,20 +94,6 @@ describe("/api/posts", () => {
 
   it.each([
     {
-      name: "赠送口令",
-      selection: { discount: 80, pieceNumber: 6 },
-      sources: { command: GIVE_COMMAND },
-      type: "GIVE",
-      payloads: { command: "￥19uSvG￥" },
-    },
-    {
-      name: "求助口令",
-      selection: { discount: 80, pieceNumber: 1 },
-      sources: { command: REQUEST_COMMAND },
-      type: "REQUEST",
-      payloads: { command: "￥19uSvR￥" },
-    },
-    {
       name: "赠送 URL",
       selection: { discount: 80, pieceNumber: 6 },
       sources: { url: GIVE_URL },
@@ -134,7 +117,14 @@ describe("/api/posts", () => {
     });
     const published = publishPost.mock.calls[0][0];
     expect(published).toMatchObject({ type, payloads, publisherId: USER_ID });
-    expect(published.payloadHashes[0]).toMatch(/^[0-9a-f]{64}$/);
+    const identity =
+      type === "GIVE"
+        ? "GIVE:/hlwyxhdhub/act-wedrecharge/1024101716:e728c7fc81f771f07c0491ee1afeac6c602855ea6c6ff236550705d032fa902eec43f56ac39454c76f35cef683460bb4"
+        : "REQUEST:/hlwyxhdhub/act-wedrecharge/1024101716:e728c7fc81f771f07c0491ee1afeac6cb0618f8dc2f3627efac80efd32f018b5";
+    expect(published.payloadHashes).toEqual([
+      createHash("sha256").update(identity).digest("hex"),
+    ]);
+    expect(published.availablePayloadKinds).toEqual(["URL"]);
   });
 
   it("按北京时间月底设置帖子过期时间", async () => {
@@ -149,19 +139,6 @@ describe("/api/posts", () => {
         expiresAt: "2026-08-31T16:00:00.000Z",
       }),
     );
-  });
-
-  it("口令拼图与选择不一致返回 400/SELECTION_MISMATCH", async () => {
-    const response = await POST(
-      request({
-        ...baseInput,
-        selection: { discount: 80, pieceNumber: 1 },
-      }),
-    );
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({
-      error: { code: "SELECTION_MISMATCH" },
-    });
   });
 
   it("请求类型与内容类型不一致返回 400/TYPE_MISMATCH", async () => {
@@ -207,7 +184,7 @@ describe("/api/posts", () => {
         ...baseInput,
         type: "REQUEST",
         selection: { discount: 80, pieceNumber: 1 },
-        sources: { command: REQUEST_COMMAND },
+        sources: { url: REQUEST_URL },
       }),
     );
     expect(response.status).toBe(402);
@@ -257,7 +234,7 @@ describe("/api/posts", () => {
           type: "GIVE",
           discount: 80,
           pieceNumber: 9,
-          availablePayloadKinds: ["COMMAND"],
+          availablePayloadKinds: ["URL"],
           publisherId: "U-0123456789ABCDEF",
           createdAt: "2027-01-15T08:00:00.000Z",
           expiresAt: "2027-01-16T08:00:00.000Z",

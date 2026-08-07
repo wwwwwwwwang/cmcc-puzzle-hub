@@ -31,9 +31,9 @@ const baseArgs: PublishPostArgs = {
   type: "GIVE",
   discount: 95,
   pieceNumber: 2,
-  payloads: { command: "secret", url: "https://h.app.coc.10086.cn/x" },
-  availablePayloadKinds: ["COMMAND", "URL"],
-  payloadHashes: ["hash-a", "hash-b"],
+  payloads: { url: "https://h.app.coc.10086.cn/x" },
+  availablePayloadKinds: ["URL"],
+  payloadHashes: ["canonical-identity-hash"],
   expiresAt: "2027-01-16T08:00:00.000Z",
 };
 
@@ -47,7 +47,7 @@ describe("publishPost", () => {
         type: "GIVE",
         discount: 95,
         pieceNumber: 2,
-        availablePayloadKinds: ["COMMAND", "URL"],
+        availablePayloadKinds: ["URL"],
         createdAt: "2027-01-15T08:00:00.000Z",
         expiresAt: "2027-01-16T08:00:00.000Z",
       },
