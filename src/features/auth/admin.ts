@@ -25,6 +25,8 @@ export type UserStatusFilter = UserStatus | null;
 export type ManagedUser = PendingUser & {
   credits: number;
   status: UserStatus;
+  rejectionReason: string | null;
+  rejectedAt: string | null;
   isAdmin: boolean;
 };
 
@@ -122,6 +124,8 @@ export async function listUsers(
     public_id: string;
     credits: number;
     status: string;
+    rejection_reason: string | null;
+    rejected_at: string | null;
     is_admin: boolean;
     registration_ip: string | null;
     same_ip_count: number;
@@ -136,6 +140,8 @@ export async function listUsers(
       publicId: row.public_id,
       credits: Number(row.credits),
       status: row.status,
+      rejectionReason: row.rejection_reason,
+      rejectedAt: row.rejected_at,
       isAdmin: Boolean(row.is_admin),
       registrationIp: row.registration_ip,
       sameIpCount: Number(row.same_ip_count),

@@ -24,7 +24,13 @@ vi.mock("@/lib/supabase/admin", () => ({
   })),
 }));
 
-import { banUser, setUserPassword, unbanUser } from "./admin-actions";
+import {
+  banUser,
+  rejectUser,
+  reopenUserReview,
+  setUserPassword,
+  unbanUser,
+} from "./admin-actions";
 
 function form(targetId = "user-1") {
   const data = new FormData();
@@ -62,6 +68,46 @@ describe("用户管理 action", () => {
 
     await expect(unbanUser({}, form())).resolves.toEqual({ success: "已解封" });
     expect(rpc).toHaveBeenCalledWith("unban_user", {
+      p_target: "user-1",
+      p_admin: "admin-1",
+    });
+  });
+
+  it("拒绝时校验原因并传入拒绝 RPC", async () => {
+    rpc.mockResolvedValue({ data: { status: "REJECTED" }, error: null });
+    const data = form();
+    data.set("reason", "微信群昵称与用户名不一致");
+
+    await expect(rejectUser({}, data)).resolves.toEqual({ success: "已拒绝" });
+    expect(rpc).toHaveBeenCalledWith("reject_user", {
+      p_target: "user-1",
+      p_admin: "admin-1",
+      p_reason: "微信群昵称与用户名不一致",
+    });
+  });
+
+  it("拒绝原因为空或超长时不调用 RPC", async () => {
+    const empty = form();
+    empty.set("reason", "   ");
+    await expect(rejectUser({}, empty)).resolves.toEqual({
+      error: "请填写拒绝原因",
+    });
+
+    const long = form();
+    long.set("reason", "a".repeat(201));
+    await expect(rejectUser({}, long)).resolves.toEqual({
+      error: "拒绝原因不能超过 200 个字符",
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("恢复已拒绝用户为待审核", async () => {
+    rpc.mockResolvedValue({ data: { status: "PENDING" }, error: null });
+
+    await expect(reopenUserReview({}, form())).resolves.toEqual({
+      success: "已恢复待审核",
+    });
+    expect(rpc).toHaveBeenCalledWith("reopen_user_review", {
       p_target: "user-1",
       p_admin: "admin-1",
     });

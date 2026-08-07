@@ -112,6 +112,33 @@ describe("signIn", () => {
     expect(supabaseSignOut).toHaveBeenCalled();
   });
 
+  it("已拒绝用户登录被登出并显示具体原因", async () => {
+    signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    profileMaybeSingle.mockResolvedValue({
+      data: {
+        status: "REJECTED",
+        rejection_reason: "微信群昵称与用户名不一致",
+      },
+    });
+
+    const state = await signIn({}, form({ username: "alice", password: "password123" }));
+
+    expect(state.error).toBe("该账号审核未通过：微信群昵称与用户名不一致");
+    expect(supabaseSignOut).toHaveBeenCalled();
+  });
+
+  it("已拒绝用户缺少原因时使用通用提示", async () => {
+    signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+    profileMaybeSingle.mockResolvedValue({
+      data: { status: "REJECTED", rejection_reason: null },
+    });
+
+    const state = await signIn({}, form({ username: "alice", password: "password123" }));
+
+    expect(state.error).toBe("该账号审核未通过，请联系管理员确认");
+    expect(supabaseSignOut).toHaveBeenCalled();
+  });
+
   it("拒绝开放重定向,回退首页", async () => {
     signInWithPassword.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
     profileMaybeSingle.mockResolvedValue({ data: { status: "APPROVED" } });

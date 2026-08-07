@@ -70,7 +70,7 @@ export async function signIn(
   // 审核门控:未通过审核立即登出并提示。
   const { data: profile } = await supabase
     .from("profiles")
-    .select("status")
+    .select("status, rejection_reason")
     .eq("id", data.user.id)
     .single();
 
@@ -80,7 +80,15 @@ export async function signIn(
       return { error: "该账号已被封禁,请联系管理员" };
     }
     if (profile?.status === "REJECTED") {
-      return { error: "该账号审核未通过,请联系管理员" };
+      const reason =
+        typeof profile.rejection_reason === "string"
+          ? profile.rejection_reason.trim()
+          : "";
+      return {
+        error: reason
+          ? `该账号审核未通过：${reason}`
+          : "该账号审核未通过，请联系管理员确认",
+      };
     }
     return {
       error: "账号待审核:请将微信群昵称改为与用户名一致,并 @管理员 审核通过后再登录",

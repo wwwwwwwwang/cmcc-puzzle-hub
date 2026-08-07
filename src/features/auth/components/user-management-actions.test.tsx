@@ -6,6 +6,7 @@ vi.mock("../admin-actions", () => ({
   rejectUser: vi.fn(async () => ({})),
   banUser: vi.fn(async () => ({})),
   unbanUser: vi.fn(async () => ({})),
+  reopenUserReview: vi.fn(async () => ({})),
   setUserPassword: vi.fn(async () => ({})),
 }));
 
@@ -55,5 +56,21 @@ describe("UserManagementActions", () => {
       <UserManagementActions targetId="admin-1" status="APPROVED" isAdmin />,
     );
     expect(screen.queryByRole("button", { name: "封禁" })).not.toBeInTheDocument();
+  });
+
+  it("已拒绝用户显示原因和恢复待审核操作", () => {
+    render(
+      <UserManagementActions
+        targetId="u1"
+        status="REJECTED"
+        isAdmin={false}
+        rejectionReason="微信群昵称与用户名不一致"
+      />,
+    );
+
+    expect(screen.getByText("微信群昵称与用户名不一致")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "恢复待审核" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "通过" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "拒绝" })).not.toBeInTheDocument();
   });
 });

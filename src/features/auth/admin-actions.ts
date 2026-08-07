@@ -13,14 +13,16 @@ function mapAdminStatus(status: string | undefined): ReviewState | null {
   if (status === "SELF_FORBIDDEN") return { error: "不能封禁自己" };
   if (status === "ADMIN_TARGET_FORBIDDEN") return { error: "不能操作管理员账号" };
   if (status === "NOT_FOUND") return { error: "用户不存在" };
+  if (status === "INVALID_REASON") return { error: "拒绝原因无效" };
   if (status === "INVALID_STATUS") return { error: "用户状态不允许此操作" };
   return null;
 }
 
 async function review(
   formData: FormData,
-  fn: "approve_user" | "reject_user",
+  fn: "approve_user" | "reject_user" | "reopen_user_review",
   okMessage: string,
+  extra: Record<string, string> = {},
 ): Promise<ReviewState> {
   const user = await getCurrentUser();
   if (!user) return { error: "请先登录" };
@@ -35,6 +37,7 @@ async function review(
     const { data, error } = await admin.rpc(fn, {
       p_target: targetId,
       p_admin: user.id,
+      ...extra,
     });
     if (error) throw new Error(error.message);
 
@@ -154,5 +157,22 @@ export async function rejectUser(
   _prevState: ReviewState,
   formData: FormData,
 ): Promise<ReviewState> {
-  return review(formData, "reject_user", "已拒绝");
+  const reason = formData.get("reason");
+  if (typeof reason !== "string" || !reason.trim()) {
+    return { error: "请填写拒绝原因" };
+  }
+  const normalizedReason = reason.trim();
+  if (normalizedReason.length > 200) {
+    return { error: "拒绝原因不能超过 200 个字符" };
+  }
+  return review(formData, "reject_user", "已拒绝", {
+    p_reason: normalizedReason,
+  });
+}
+
+export async function reopenUserReview(
+  _prevState: ReviewState,
+  formData: FormData,
+): Promise<ReviewState> {
+  return review(formData, "reopen_user_review", "已恢复待审核");
 }

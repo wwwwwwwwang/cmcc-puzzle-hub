@@ -129,6 +129,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 targetId={user.id}
                 status={user.status}
                 isAdmin={user.isAdmin}
+                rejectionReason={user.rejectionReason}
               />
             </li>
           ))}
