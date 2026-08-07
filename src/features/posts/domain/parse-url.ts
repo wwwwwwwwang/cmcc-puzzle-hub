@@ -1,5 +1,5 @@
 import { DomainError } from "./errors";
-import type { ParsedSource, PostType } from "./types";
+import type { ParsedSource } from "./types";
 
 const OUTER_HOSTNAME = "h.app.coc.10086.cn";
 const OUTER_PATHNAME = "/activity/zx/transit/transferDownload.html";
