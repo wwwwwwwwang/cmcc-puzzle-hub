@@ -161,7 +161,7 @@ test("同一二维码重复发布被拦截", async ({ page }) => {
     .setInputFiles(resolve("tests/fixtures/give-url-qr.png"));
   await page.getByRole("button", { name: "发布" }).click();
 
-  await expect(page.getByRole("alert")).toHaveText(
+  await expect(page.locator('p[role="alert"]')).toHaveText(
     "该二维码对应的拼图已经发布过了",
   );
   expect(calls.publishBodies).toHaveLength(1);
@@ -177,7 +177,7 @@ test("发布类型与二维码类型不一致时阻止发布", async ({ page }) 
     .getByLabel("选择二维码图片")
     .setInputFiles(resolve("tests/fixtures/give-url-qr.png"));
 
-  await expect(page.getByRole("alert")).toHaveText(
+  await expect(page.locator('p[role="alert"]')).toHaveText(
     "选择的是求助，但内容识别为赠送，请更换内容或发布类型",
   );
   await expect(page.getByRole("button", { name: "发布" })).toBeDisabled();
@@ -195,7 +195,7 @@ test("大厅求助帖使用二维码完成助力并等待确认", async ({ page 
   await page.getByRole("button", { name: "去助力" }).click();
   await page.getByRole("button", { name: "使用链接助力" }).click();
 
-  await expect(page.getByText("助力已提交，等待对方确认")).toBeVisible();
+  await page.waitForURL((url) => url.hostname === "h.app.coc.10086.cn");
   expect(calls.help).toBe(1);
   expect(calls.claim).toBe(0);
   expect(getCmccHeaders()["x-e2e-auth-token"]).toBeUndefined();
