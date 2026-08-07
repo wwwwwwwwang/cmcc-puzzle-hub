@@ -1,18 +1,30 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentUser, rpc, revalidatePath } = vi.hoisted(() => ({
+const {
+  getCurrentUser,
+  rpc,
+  revalidatePath,
+  profileSingle,
+  updateUserById,
+} = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
   rpc: vi.fn(),
   revalidatePath: vi.fn(),
+  profileSingle: vi.fn(),
+  updateUserById: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath }));
 vi.mock("@/lib/supabase/server", () => ({ getCurrentUser }));
 vi.mock("@/lib/supabase/admin", () => ({
-  createSupabaseAdminClient: vi.fn(() => ({ rpc })),
+  createSupabaseAdminClient: vi.fn(() => ({
+    rpc,
+    from: () => ({ select: () => ({ eq: () => ({ single: profileSingle }) }) }),
+    auth: { admin: { updateUserById } },
+  })),
 }));
 
-import { banUser, unbanUser } from "./admin-actions";
+import { banUser, setUserPassword, unbanUser } from "./admin-actions";
 
 function form(targetId = "user-1") {
   const data = new FormData();
@@ -53,5 +65,33 @@ describe("用户管理 action", () => {
       p_target: "user-1",
       p_admin: "admin-1",
     });
+  });
+
+  it("管理员设置密码前校验两次输入并调用 Supabase Admin API", async () => {
+    profileSingle
+      .mockResolvedValueOnce({ data: { is_admin: true }, error: null })
+      .mockResolvedValueOnce({ data: { is_admin: false }, error: null });
+    updateUserById.mockResolvedValue({ error: null });
+    const data = form();
+    data.set("password", "new-password");
+    data.set("confirmPassword", "new-password");
+
+    await expect(setUserPassword({}, data)).resolves.toEqual({
+      success: "密码已设置",
+    });
+    expect(updateUserById).toHaveBeenCalledWith("user-1", {
+      password: "new-password",
+    });
+  });
+
+  it("密码不一致时不调用 Supabase", async () => {
+    const data = form();
+    data.set("password", "new-password");
+    data.set("confirmPassword", "different-password");
+
+    await expect(setUserPassword({}, data)).resolves.toEqual({
+      error: "两次密码输入不一致",
+    });
+    expect(updateUserById).not.toHaveBeenCalled();
   });
 });

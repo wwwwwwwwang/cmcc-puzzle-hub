@@ -7,6 +7,7 @@ import {
   isCurrentUserAdmin,
   listUsers,
   USER_STATUSES,
+  USER_PAGE_SIZE,
   type UserStatus,
 } from "@/features/auth/admin";
 import { UserManagementActions } from "@/features/auth/components/user-management-actions";
@@ -22,7 +23,11 @@ const STATUS_LABELS: Record<UserStatus | "ALL", string> = {
 };
 
 type AdminPageProps = {
-  searchParams: Promise<{ status?: string | string[] }>;
+  searchParams: Promise<{
+    status?: string | string[];
+    search?: string | string[];
+    page?: string | string[];
+  }>;
 };
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
@@ -30,10 +35,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   const params = await searchParams;
   const rawStatus = Array.isArray(params.status) ? params.status[0] : params.status;
+  const rawSearch = Array.isArray(params.search) ? params.search[0] : params.search;
+  const search = rawSearch?.trim() ?? "";
+  const rawPage = Array.isArray(params.page) ? params.page[0] : params.page;
+  const page = Number.isInteger(Number(rawPage)) && Number(rawPage) > 0 ? Number(rawPage) : 1;
   const status = USER_STATUSES.includes(rawStatus as UserStatus)
     ? (rawStatus as UserStatus)
     : null;
-  const users = await listUsers(status);
+  const result = await listUsers(status, search, page, USER_PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize));
 
   return (
     <div className="space-y-6 px-4 py-6">
@@ -52,14 +62,31 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </p>
       </section>
 
+      <form action="/admin" className="flex items-end gap-2" role="search">
+        <label className="min-w-0 flex-1 space-y-1 text-xs font-medium text-slate-600">
+          <span>搜索用户名</span>
+          <input
+            aria-label="搜索用户名"
+            name="search"
+            type="search"
+            defaultValue={search}
+            placeholder="输入用户名"
+            className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          />
+        </label>
+        <button type="submit" className="h-9 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700">
+          搜索
+        </button>
+      </form>
+
       <nav aria-label="用户状态筛选" className="flex flex-wrap gap-2">
-        <FilterLink label="全部" active={status === null} />
+        <FilterLink label="全部" active={status === null} search={search} />
         {USER_STATUSES.map((value) => (
-          <FilterLink key={value} label={STATUS_LABELS[value]} value={value} active={status === value} />
+          <FilterLink key={value} label={STATUS_LABELS[value]} value={value} active={status === value} search={search} />
         ))}
       </nav>
 
-      {users.length === 0 ? (
+      {result.users.length === 0 ? (
         <EmptyState
           icon={status === "PENDING" ? ShieldCheck : UsersRound}
           title={status ? `暂无${STATUS_LABELS[status]}用户` : "暂无用户"}
@@ -67,7 +94,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         />
       ) : (
         <ul className="space-y-3">
-          {users.map((user) => (
+          {result.users.map((user) => (
             <li key={user.id} className="space-y-3 rounded-lg border border-slate-200 px-4 py-3">
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -104,6 +131,22 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           ))}
         </ul>
       )}
+
+      {result.total > 0 ? (
+        <nav aria-label="用户分页" className="flex items-center justify-between gap-3 text-sm">
+          {result.page > 1 ? (
+            <a href={adminHref({ status, search, page: result.page - 1 })} className="rounded-lg border border-slate-200 px-3 py-1.5 text-slate-600 hover:border-blue-200 hover:text-blue-700">
+              上一页
+            </a>
+          ) : <span />}
+          <span className="text-xs text-slate-500">第 {result.page} / {totalPages} 页，共 {result.total} 个用户</span>
+          {result.page < totalPages ? (
+            <a href={adminHref({ status, search, page: result.page + 1 })} className="rounded-lg border border-slate-200 px-3 py-1.5 text-slate-600 hover:border-blue-200 hover:text-blue-700">
+              下一页
+            </a>
+          ) : <span />}
+        </nav>
+      ) : null}
     </div>
   );
 }
@@ -112,12 +155,14 @@ function FilterLink({
   label,
   value,
   active,
+  search,
 }: {
   label: string;
   value?: UserStatus;
   active: boolean;
+  search: string;
 }) {
-  const href = value ? `/admin?status=${value}` : "/admin";
+  const href = adminHref({ status: value ?? null, search, page: 1 });
   return (
     <a
       href={href}
@@ -131,6 +176,23 @@ function FilterLink({
       {label}
     </a>
   );
+}
+
+function adminHref({
+  status,
+  search,
+  page,
+}: {
+  status: UserStatus | null;
+  search: string;
+  page: number;
+}) {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (search) params.set("search", search);
+  if (page > 1) params.set("page", String(page));
+  const query = params.toString();
+  return query ? `/admin?${query}` : "/admin";
 }
 
 function statusClass(status: UserStatus) {

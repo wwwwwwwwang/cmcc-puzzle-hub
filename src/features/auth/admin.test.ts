@@ -17,7 +17,7 @@ import { listUsers } from "./admin";
 describe("listUsers", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("按状态调用全量用户 RPC 并映射管理字段", async () => {
+  it("按状态、搜索和分页调用用户 RPC 并映射总数", async () => {
     getCurrentUser.mockResolvedValue({ id: "admin-1" });
     rpc.mockResolvedValue({
       data: [
@@ -31,13 +31,14 @@ describe("listUsers", () => {
           registration_ip: "127.0.0.1",
           same_ip_count: 2,
           created_at: "2026-08-07T00:00:00Z",
+          total_count: 21,
         },
       ],
       error: null,
     });
 
-    await expect(listUsers("APPROVED")).resolves.toEqual([
-      {
+    await expect(listUsers("APPROVED", "Alice", 2, 20)).resolves.toEqual({
+      users: [{
         id: "user-1",
         username: "Alice",
         publicId: "U-1",
@@ -47,11 +48,17 @@ describe("listUsers", () => {
         registrationIp: "127.0.0.1",
         sameIpCount: 2,
         createdAt: "2026-08-07T00:00:00Z",
-      },
-    ]);
+      }],
+      total: 21,
+      page: 2,
+      pageSize: 20,
+    });
     expect(rpc).toHaveBeenCalledWith("list_users", {
       p_admin: "admin-1",
       p_status: "APPROVED",
+      p_search: "Alice",
+      p_limit: 20,
+      p_offset: 20,
     });
   });
 });

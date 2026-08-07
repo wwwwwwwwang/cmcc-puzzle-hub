@@ -10,6 +10,7 @@ import {
   type ReviewState,
 } from "../admin-actions";
 import { ReviewButtons } from "./review-buttons";
+import { PasswordSetControl } from "./password-set-control";
 
 const BAN_CONFIRM_MESSAGE =
   "确认封禁该用户？开放帖子会下架并退回求助信用，等待确认的助力会结束且不发放助力信用。";
@@ -60,6 +61,7 @@ export function UserManagementActions({
           </form>
         ) : null}
       </div>
+      {!isAdmin ? <PasswordSetControl targetId={targetId} /> : null}
       {!isAdmin && status !== "BANNED" ? (
         <p className="text-xs leading-5 text-amber-700">
           封禁后开放帖子会下架，待确认求助会结束并按规则处理信用。

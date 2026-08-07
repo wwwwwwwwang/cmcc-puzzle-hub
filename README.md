@@ -52,7 +52,7 @@ CLAIM_LIMIT_PER_DAY=10
 REGISTER_LIMIT_PER_DAY_PER_IP=3
 ```
 
-信用上限(`app.seed_credits`、`app.earn_cap_per_day`)是 **Postgres 数据库设置**，不走 `.env`，在 Supabase SQL Editor 用 `alter database ... set` 配置；留空则用函数内默认(种子 1、每日封顶 5)。发布前需在 Supabase 依次执行 `supabase/migrations/0001`→`0005`，并确认 `pg_cron` 中的 `cmcc-request-help-maintenance` 每 5 分钟执行 `sync_request_maintenance()`。`SUPABASE_SERVICE_ROLE_KEY` 权限极高，只在服务端使用，不要提交 `.env.local` 或任何密钥到 Git。
+信用上限(`app.seed_credits`、`app.earn_cap_per_day`)是 **Postgres 数据库设置**，不走 `.env`，在 Supabase SQL Editor 用 `alter database ... set` 配置；留空则用函数内默认(种子 1、每日封顶 5)。发布前需在 Supabase 依次执行 `supabase/migrations/0001`→`0008`，并确认 `pg_cron` 中的 `cmcc-request-help-maintenance` 每 5 分钟执行 `sync_request_maintenance()`。`SUPABASE_SERVICE_ROLE_KEY` 权限极高，只在服务端使用，不要提交 `.env.local` 或任何密钥到 Git。
 
 ## 账号、审核与信用
 

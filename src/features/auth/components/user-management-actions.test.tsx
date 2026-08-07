@@ -6,6 +6,7 @@ vi.mock("../admin-actions", () => ({
   rejectUser: vi.fn(async () => ({})),
   banUser: vi.fn(async () => ({})),
   unbanUser: vi.fn(async () => ({})),
+  setUserPassword: vi.fn(async () => ({})),
 }));
 
 import { UserManagementActions } from "./user-management-actions";

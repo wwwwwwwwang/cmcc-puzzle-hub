@@ -28,6 +28,15 @@ export type ManagedUser = PendingUser & {
   isAdmin: boolean;
 };
 
+export const USER_PAGE_SIZE = 20;
+
+export type ManagedUserPage = {
+  users: ManagedUser[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 /**
  * 当前会话是否为管理员。
  */
@@ -82,18 +91,30 @@ function isUserStatus(value: string | null | undefined): value is UserStatus {
 
 export async function listUsers(
   status: UserStatusFilter = null,
-): Promise<ManagedUser[]> {
+  search = "",
+  page = 1,
+  pageSize = USER_PAGE_SIZE,
+): Promise<ManagedUserPage> {
   const user = await getCurrentUser();
-  if (!user) return [];
+  const normalizedPage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
+  const normalizedPageSize = Number.isFinite(pageSize)
+    ? Math.min(50, Math.max(1, Math.floor(pageSize)))
+    : USER_PAGE_SIZE;
+  if (!user) {
+    return { users: [], total: 0, page: normalizedPage, pageSize: normalizedPageSize };
+  }
 
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin.rpc("list_users", {
     p_admin: user.id,
     p_status: isUserStatus(status) ? status : null,
+    p_search: search.trim(),
+    p_limit: normalizedPageSize,
+    p_offset: (normalizedPage - 1) * normalizedPageSize,
   });
   if (error) throw new Error(`list_users 调用失败: ${error.message}`);
 
-  return ((data ?? []) as {
+  const rows = (data ?? []) as {
     id: string;
     username: string | null;
     public_id: string;
@@ -103,7 +124,9 @@ export async function listUsers(
     registration_ip: string | null;
     same_ip_count: number;
     created_at: string;
-  }[]).flatMap((row) => {
+    total_count: number;
+  }[];
+  const users = rows.flatMap((row) => {
     if (!isUserStatus(row.status)) return [];
     return [{
       id: row.id,
@@ -117,4 +140,10 @@ export async function listUsers(
       createdAt: row.created_at,
     }];
   });
+  return {
+    users,
+    total: Number(rows[0]?.total_count ?? 0),
+    page: normalizedPage,
+    pageSize: normalizedPageSize,
+  };
 }
