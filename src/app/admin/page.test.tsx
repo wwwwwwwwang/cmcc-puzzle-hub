@@ -51,7 +51,7 @@ describe("AdminPage", () => {
     expect(screen.getByRole("heading", { name: "用户管理" })).toBeInTheDocument();
     expect(screen.queryByText(/开放帖子会下架/)).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("暂无用户");
-    expect(listUsers).toHaveBeenCalledWith(null, "", 1, 20);
+    expect(listUsers).toHaveBeenCalledWith(null, "", "", 1, 20);
   });
 
   it("按状态筛选并显示用户资料与同 IP 风险", async () => {
@@ -77,24 +77,29 @@ describe("AdminPage", () => {
 
     render(
       await AdminPage({
-        searchParams: Promise.resolve({ status: "BANNED", search: "测试", page: "2" }),
+        searchParams: Promise.resolve({ status: "BANNED", search: "测试", ip: "127.0.0.1", page: "2" }),
       }),
     );
 
-    expect(listUsers).toHaveBeenCalledWith("BANNED", "测试", 2, 20);
+    expect(listUsers).toHaveBeenCalledWith("BANNED", "测试", "127.0.0.1", 2, 20);
     expect(screen.getByRole("searchbox", { name: "搜索用户名" })).toHaveValue("测试");
+    expect(document.querySelector('input[name="ip"]')).toHaveAttribute("value", "127.0.0.1");
     expect(screen.getByText("测试用户")).toBeInTheDocument();
     expect(screen.getByText("U-1")).toBeInTheDocument();
     expect(screen.getByText("信用 3")).toBeInTheDocument();
     expect(screen.getByText("同 IP 2 个账号")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "同 IP 2 个账号" })).toHaveAttribute(
+      "href",
+      "/admin?status=BANNED&search=%E6%B5%8B%E8%AF%95&ip=127.0.0.1",
+    );
     expect(screen.getByText("管理 user-1")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "上一页" })).toHaveAttribute(
       "href",
-      "/admin?status=BANNED&search=%E6%B5%8B%E8%AF%95",
+      "/admin?status=BANNED&search=%E6%B5%8B%E8%AF%95&ip=127.0.0.1",
     );
     expect(screen.getByRole("link", { name: "下一页" })).toHaveAttribute(
       "href",
-      "/admin?status=BANNED&search=%E6%B5%8B%E8%AF%95&page=3",
+      "/admin?status=BANNED&search=%E6%B5%8B%E8%AF%95&ip=127.0.0.1&page=3",
     );
   });
 });

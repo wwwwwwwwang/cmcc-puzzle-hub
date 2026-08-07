@@ -37,7 +37,7 @@ describe("listUsers", () => {
       error: null,
     });
 
-    await expect(listUsers("APPROVED", "Alice", 2, 20)).resolves.toEqual({
+    await expect(listUsers("APPROVED", "Alice", "127.0.0.1", 2, 20)).resolves.toEqual({
       users: [{
         id: "user-1",
         username: "Alice",
@@ -57,6 +57,7 @@ describe("listUsers", () => {
       p_admin: "admin-1",
       p_status: "APPROVED",
       p_search: "Alice",
+      p_registration_ip: "127.0.0.1",
       p_limit: 20,
       p_offset: 20,
     });

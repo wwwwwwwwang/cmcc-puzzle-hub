@@ -92,6 +92,7 @@ function isUserStatus(value: string | null | undefined): value is UserStatus {
 export async function listUsers(
   status: UserStatusFilter = null,
   search = "",
+  registrationIp = "",
   page = 1,
   pageSize = USER_PAGE_SIZE,
 ): Promise<ManagedUserPage> {
@@ -109,6 +110,7 @@ export async function listUsers(
     p_admin: user.id,
     p_status: isUserStatus(status) ? status : null,
     p_search: search.trim(),
+    p_registration_ip: registrationIp.trim(),
     p_limit: normalizedPageSize,
     p_offset: (normalizedPage - 1) * normalizedPageSize,
   });
