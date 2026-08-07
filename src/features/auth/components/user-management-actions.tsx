@@ -62,11 +62,6 @@ export function UserManagementActions({
         ) : null}
       </div>
       {!isAdmin ? <PasswordSetControl targetId={targetId} /> : null}
-      {!isAdmin && status !== "BANNED" ? (
-        <p className="text-xs leading-5 text-amber-700">
-          封禁后开放帖子会下架，待确认求助会结束并按规则处理信用。
-        </p>
-      ) : null}
       {message ? (
         <p
           role={banState.error || unbanState.error ? "alert" : "status"}

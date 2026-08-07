@@ -42,14 +42,14 @@ describe("AdminPage", () => {
     expect(listUsers).not.toHaveBeenCalled();
   });
 
-  it("管理员默认查看全部用户并展示封禁影响说明", async () => {
+  it("管理员默认查看全部用户且不在列表展示封禁说明", async () => {
     isCurrentUserAdmin.mockResolvedValue(true);
     listUsers.mockResolvedValue({ users: [], total: 0, page: 1, pageSize: 20 });
 
     render(await AdminPage({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByRole("heading", { name: "用户管理" })).toBeInTheDocument();
-    expect(screen.getByText(/开放帖子会下架/)).toBeInTheDocument();
+    expect(screen.queryByText(/开放帖子会下架/)).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("暂无用户");
     expect(listUsers).toHaveBeenCalledWith(null, "", 1, 20);
   });

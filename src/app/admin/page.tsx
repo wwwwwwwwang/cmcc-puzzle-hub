@@ -52,16 +52,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         description="查看全部账号，处理注册审核和账号状态。"
       />
 
-      <section
-        aria-label="封禁影响说明"
-        className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900"
-      >
-        <p className="font-semibold">封禁影响</p>
-        <p>
-          封禁不会删除账号或历史记录。开放帖子会下架并退回求助信用；等待确认的求助会结束当前助力，未过期时按原截止时间重新开放，已过期时退款结束；已完成和已过期记录不变。
-        </p>
-      </section>
-
       <form action="/admin" className="flex items-end gap-2" role="search">
         <label className="min-w-0 flex-1 space-y-1 text-xs font-medium text-slate-600">
           <span>搜索用户名</span>
