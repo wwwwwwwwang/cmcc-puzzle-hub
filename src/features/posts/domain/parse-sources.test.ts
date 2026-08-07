@@ -25,6 +25,8 @@ describe("parseSources", () => {
       type: "GIVE",
       sources: { command: "￥19uSvG￥", url: GIVE_URL },
       explicitSelection: { discount: 80, pieceNumber: 6 },
+      identity:
+        "GIVE:/hlwyxhdhub/act-wedrecharge/1024101716:e728c7fc81f771f07c0491ee1afeac6c602855ea6c6ff236550705d032fa902eec43f56ac39454c76f35cef683460bb4",
     });
   });
 
@@ -38,10 +40,24 @@ describe("parseSources", () => {
 
     expect(
       parseSources(
+        { command: GIVE_COMMAND },
+        { discount: 80, pieceNumber: 6 },
+      ).identity,
+    ).toBeNull();
+
+    expect(
+      parseSources(
         { url: GIVE_URL },
         { discount: 80, pieceNumber: 6 },
       ).sources,
     ).toEqual({ url: GIVE_URL });
+
+    expect(
+      parseSources(
+        { url: GIVE_URL },
+        { discount: 80, pieceNumber: 6 },
+      ).identity,
+    ).toMatch(/^GIVE:/);
   });
 
   it("rejects sources with different post types", () => {

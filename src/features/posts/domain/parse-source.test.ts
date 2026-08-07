@@ -32,6 +32,7 @@ describe("parseSource", () => {
       payloadKind: "COMMAND",
       payload: "￥19uSvG￥",
       explicitSelection: { discount: 80, pieceNumber: 6 },
+      identity: null,
     });
   });
 
@@ -54,6 +55,8 @@ describe("parseSource", () => {
       payloadKind: "URL",
       payload: GIVE_URL,
       explicitSelection: null,
+      identity:
+        "GIVE:/hlwyxhdhub/act-wedrecharge/1024101716:e728c7fc81f771f07c0491ee1afeac6c602855ea6c6ff236550705d032fa902eec43f56ac39454c76f35cef683460bb4",
     });
   });
 });

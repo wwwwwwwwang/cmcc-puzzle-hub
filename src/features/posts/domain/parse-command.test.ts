@@ -22,6 +22,7 @@ describe("parseCommand", () => {
       payloadKind: "COMMAND",
       payload: "￥19uSvG￥",
       explicitSelection: { discount: 80, pieceNumber: 6 },
+      identity: null,
     });
   });
 
@@ -31,6 +32,7 @@ describe("parseCommand", () => {
       payloadKind: "COMMAND",
       payload: "￥19uSvR￥",
       explicitSelection: { discount: 80, pieceNumber: 1 },
+      identity: null,
     });
   });
 

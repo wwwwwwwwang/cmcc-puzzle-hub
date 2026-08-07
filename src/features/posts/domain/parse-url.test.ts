@@ -7,6 +7,11 @@ import {
 import { DomainError } from "./errors";
 import { parseUrl } from "./parse-url";
 
+const GIVE_IDENTITY =
+  "GIVE:/hlwyxhdhub/act-wedrecharge/1024101716:e728c7fc81f771f07c0491ee1afeac6c602855ea6c6ff236550705d032fa902eec43f56ac39454c76f35cef683460bb4";
+const REQUEST_IDENTITY =
+  "REQUEST:/hlwyxhdhub/act-wedrecharge/1024101716:e728c7fc81f771f07c0491ee1afeac6cb0618f8dc2f3627efac80efd32f018b5";
+
 function expectInvalidUrl(value: string) {
   try {
     parseUrl(value);
@@ -32,6 +37,7 @@ describe("parseUrl", () => {
       payloadKind: "URL",
       payload: GIVE_URL,
       explicitSelection: null,
+      identity: GIVE_IDENTITY,
     });
   });
 
@@ -41,11 +47,44 @@ describe("parseUrl", () => {
       payloadKind: "URL",
       payload: REQUEST_URL,
       explicitSelection: null,
+      identity: REQUEST_IDENTITY,
     });
   });
 
   it("trims the valid outer URL while preserving its original representation", () => {
     expect(parseUrl(`  ${GIVE_URL}\n`).payload).toBe(GIVE_URL);
+  });
+
+  it("ignores outer tracking parameters and their order in the identity", () => {
+    const original = new URL(GIVE_URL);
+    const reordered = new URL(`${original.origin}${original.pathname}`);
+    reordered.searchParams.set("sellerId", "different-seller");
+    reordered.searchParams.set("channelId", "different-channel");
+    reordered.searchParams.set("targetUrl", original.searchParams.get("targetUrl")!);
+    reordered.searchParams.set("pageId", "different-page");
+
+    expect(parseUrl(reordered.toString()).identity).toBe(GIVE_IDENTITY);
+  });
+
+  it("ignores the request phone parameter in the identity", () => {
+    const outer = new URL(REQUEST_URL);
+    const target = new URL(outer.searchParams.get("targetUrl")!);
+    target.searchParams.set("phone", "9999");
+    outer.searchParams.set("targetUrl", target.toString());
+
+    expect(parseUrl(outer.toString()).identity).toBe(REQUEST_IDENTITY);
+  });
+
+  it("changes the identity when the business token or activity path changes", () => {
+    const tokenChanged = createOuterUrl(
+      "https://wx.10086.cn/hlwyxhdhub/act-wedrecharge/1024101716?giveCard=another-token",
+    );
+    const pathChanged = createOuterUrl(
+      "https://wx.10086.cn/hlwyxhdhub/act-wedrecharge/2026080712?giveCard=e728c7fc81f771f07c0491ee1afeac6c602855ea6c6ff236550705d032fa902eec43f56ac39454c76f35cef683460bb4",
+    );
+
+    expect(parseUrl(tokenChanged).identity).not.toBe(GIVE_IDENTITY);
+    expect(parseUrl(pathChanged).identity).not.toBe(GIVE_IDENTITY);
   });
 
   it("rejects an outer HTTP URL", () => {

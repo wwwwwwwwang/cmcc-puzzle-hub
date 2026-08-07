@@ -34,12 +34,14 @@ export type ParsedSource = {
   payloadKind: PayloadKind;
   payload: string;
   explicitSelection: PuzzleSelection | null;
+  identity: string | null;
 };
 
 export type ParsedSources = {
   type: PostType;
   sources: PostSources;
   explicitSelection: PuzzleSelection | null;
+  identity: string | null;
 };
 
 export type HallPostDto = PuzzleSelection & {

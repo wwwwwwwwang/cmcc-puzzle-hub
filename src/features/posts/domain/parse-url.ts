@@ -10,7 +10,7 @@ function invalidUrl(): never {
   throw new DomainError("INVALID_CONTENT", "链接内容无效");
 }
 
-function parseBusinessType(targetUrl: URL): PostType {
+function parseBusinessIdentity(targetUrl: URL) {
   const giveCards = targetUrl.searchParams.getAll("giveCard");
   const requestCards = targetUrl.searchParams.getAll("requestCard");
   const businessParameterCount = giveCards.length + requestCards.length;
@@ -20,10 +20,12 @@ function parseBusinessType(targetUrl: URL): PostType {
   }
 
   if (giveCards.length === 1) {
-    return giveCards[0] === "" ? invalidUrl() : "GIVE";
+    if (giveCards[0] === "") return invalidUrl();
+    return { type: "GIVE" as const, token: giveCards[0] };
   }
 
-  return requestCards[0] === "" ? invalidUrl() : "REQUEST";
+  if (requestCards[0] === "") return invalidUrl();
+  return { type: "REQUEST" as const, token: requestCards[0] };
 }
 
 export function parseUrl(value: string): ParsedSource {
@@ -56,11 +58,14 @@ export function parseUrl(value: string): ParsedSource {
       return invalidUrl();
     }
 
+    const business = parseBusinessIdentity(targetUrl);
+
     return {
-      type: parseBusinessType(targetUrl),
+      type: business.type,
       payloadKind: "URL",
       payload,
       explicitSelection: null,
+      identity: `${business.type}:${targetUrl.pathname}:${business.token}`,
     };
   } catch (error) {
     if (error instanceof DomainError) {

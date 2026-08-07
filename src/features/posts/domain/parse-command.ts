@@ -49,5 +49,6 @@ export function parseCommand(command: string): ParsedSource {
     payloadKind: "COMMAND",
     payload: keys[0],
     explicitSelection: { discount, pieceNumber },
+    identity: null,
   };
 }

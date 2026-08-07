@@ -77,5 +77,6 @@ export function parseSources(
       ...(url ? { url: url.payload } : {}),
     },
     explicitSelection: command?.explicitSelection ?? null,
+    identity: url?.identity ?? null,
   };
 }
