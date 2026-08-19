@@ -48,7 +48,7 @@ pnpm build
 ### 关键不变量(改动前务必理解)
 
 1. **并发正确性 + 信用变动靠 plpgsql `SECURITY DEFINER` 函数的单事务,不靠应用层。** GIVE 由 `claim_post` 锁帖并立即结算；REQUEST 由 `publish_post` 托管、`help_request_post` 锁帖创建单个 PENDING 助力、`resolve_request_help` 主动确认/拒绝，`sync_request_maintenance` 自动确认和到期退款。任一失败整事务回滚；改这些 SQL 必须同步更新集成测试。
-2. **信用规则。** 种子默认 1；领取 GIVE -1，GIVE 被他人领取给发布者 +1(受每日封顶)；发布 REQUEST -1 并记 `ESCROW_REQUEST`，助力确认后 B +1 并记 `EARN_HELP_CONFIRMED`，拒绝且已过期/无人助力到期则 A +1 并记 `REFUND_REQUEST`。被拒绝的 B 不能再次助力同帖。
+2. **信用规则。** 种子默认 1；领取 GIVE -1，GIVE 被他人领取给发布者 +1(受每日封顶;领取人与发布者注册 IP 相同则视为疑似同一人,由 `claim_post` 判定不加分)；发布 REQUEST -1 并记 `ESCROW_REQUEST`，助力确认后 B +1 并记 `EARN_HELP_CONFIRMED`，拒绝且已过期/无人助力到期则 A +1 并记 `REFUND_REQUEST`。被拒绝的 B 不能再次助力同帖。
 3. **隐私边界。** 大厅只经 `list_hall_posts`/`hall_posts` 视图返回安全列(含 `publisher_public_id`),**绝不返回 `payloads`**;`payloads` 只由 `claim_post`/`help_request_post` 返回给参与者，或 `user-queries` 经 RLS 返回给相关本人。`/api/me/activity` 只返回计数和版本。二维码图片仅浏览器内经 Canvas+jsQR 解码,**绝不上传**(e2e 有断言)。
 4. **RLS。** `profiles`、`posts`、`credit_ledger`、`active_payload_hashes`、`request_help_attempts` 全开 RLS；客户端无直接写策略；service-role 客户端只在服务端调用写 RPC，函数内再次校验用户归属。
 5. **过期与自动确认。** Postgres 无 TTL；`expires_at` 保留原截止时间。Supabase Cron 每 5 分钟调用 `sync_request_maintenance()`，完成 24 小时自动确认、REQUEST 到期退款、GIVE 过期和去重清理。维护 RPC 仅授予 `service_role`。

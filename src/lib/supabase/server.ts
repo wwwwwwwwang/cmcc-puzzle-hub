@@ -103,6 +103,11 @@ export async function getAuthSession(): Promise<SessionProfile> {
     .eq("id", user.id)
     .single();
 
+  // 被封禁或拒绝的账号视为未登录,不保留会话界面(写接口另有 getApprovedUser 拦截)。
+  if (!profile || profile.status === "BANNED" || profile.status === "REJECTED") {
+    return ANON_SESSION;
+  }
+
   return {
     isAuthenticated: true,
     isApproved: profile?.status === "APPROVED",
