@@ -55,8 +55,6 @@ REGISTER_LIMIT_PER_DAY_PER_IP=3
 
 信用上限(`app.earn_cap_per_day`)是 **Postgres 数据库设置**，不走 `.env`，在 Supabase SQL Editor 用 `alter database ... set` 配置；留空则用函数内默认(每日封顶 5)。审核通过固定发放 3 点信用。发布前需在 Supabase 依次执行 `supabase/migrations/0001`→`0016`，并确认 `pg_cron` 中的 `cmcc-request-help-maintenance` 每 5 分钟执行 `sync_request_maintenance()`。管理员 RPC 只允许 `service_role` 调用。`SUPABASE_SERVICE_ROLE_KEY` 权限极高，只在服务端使用，不要提交 `.env.local` 或任何密钥到 Git。
 
-后续迁移可使用 GitHub Actions 工作流 `Supabase Migrations` 自动执行。已有手工迁移历史的项目首次选择 `baseline`，全新数据库选择 `fresh`，首次成功后将仓库变量 `SUPABASE_MIGRATIONS_ENABLED` 设为 `true`。
-
 ## 账号、审核与信用
 
 - **用户名 + 密码**注册,不用邮箱(内部把归一化用户名的 SHA-256 合成假邮箱喂 Supabase Auth,用户永不接触邮箱)。注册后 `status=PENDING`、不发种子信用。
