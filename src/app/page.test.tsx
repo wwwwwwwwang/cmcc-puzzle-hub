@@ -12,6 +12,9 @@ vi.mock("@/features/posts/components/post-filters", () => ({
     <output aria-label="筛选属性">{JSON.stringify(props)}</output>
   ),
 }));
+vi.mock("@/features/posts/server/post-repository", () => ({
+  listPosts: vi.fn(async () => ({ items: [], nextCursor: null })),
+}));
 
 import Home from "./page";
 
@@ -48,7 +51,12 @@ describe("Home", () => {
       JSON.stringify({ discount: 80, type: "REQUEST", pieceNumber: 6 }),
     );
     expect(screen.getByLabelText("列表属性")).toHaveTextContent(
-      JSON.stringify({ discount: 80, type: "REQUEST", pieceNumber: 6 }),
+      JSON.stringify({
+        discount: 80,
+        type: "REQUEST",
+        pieceNumber: 6,
+        initialPage: { items: [], nextCursor: null },
+      }),
     );
   });
 

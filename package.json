@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
-    "@fingerprintjs/fingerprintjs": "^5.2.0",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.1",
     "@upstash/ratelimit": "^2.0.8",
@@ -52,5 +51,5 @@
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.10"
   },
-  "packageManager": "pnpm@10.32.1"
+  "packageManager": "pnpm@12.11.2+sha512.25a51652a196785af5f28bda6dfe8dc582ebefa4ac1d180221ce1390231c5fb76637822ea4b6e4633ce74acdcb0a77f725af11bad38177fdeddaee818a955cb9"
 }

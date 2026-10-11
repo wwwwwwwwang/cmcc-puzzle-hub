@@ -64,7 +64,6 @@ export function parseUrl(value: string): ParsedSource {
       type: business.type,
       payloadKind: "URL",
       payload,
-      explicitSelection: null,
       identity: `${business.type}:${targetUrl.pathname}:${business.token}`,
     };
   } catch (error) {

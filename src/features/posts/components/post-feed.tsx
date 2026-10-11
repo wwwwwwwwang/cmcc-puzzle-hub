@@ -1,26 +1,43 @@
 "use client";
 
-import { LoaderCircle, Puzzle, RefreshCw } from "lucide-react";
+import { Puzzle, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import type { HallPostDto, PostType, Discount } from "@/features/posts/domain/types";
+import { Skeleton } from "@/components/ui/skeleton";
+import type {
+  Discount,
+  HallPostDto,
+  HallPostPage,
+  PostType,
+} from "@/features/posts/domain/types";
 import { PostCard } from "./post-card";
 
 type PostFeedProps = {
   type?: PostType;
   discount?: Discount;
   pieceNumber?: number;
+  initialPage?: HallPostPage;
 };
 
-export function PostFeed({ type, discount, pieceNumber }: PostFeedProps) {
-  const [items, setItems] = useState<HallPostDto[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+export function PostFeed({
+  type,
+  discount,
+  pieceNumber,
+  initialPage,
+}: PostFeedProps) {
+  const [items, setItems] = useState<HallPostDto[]>(
+    initialPage?.items ?? [],
+  );
+  const [cursor, setCursor] = useState<string | null>(
+    initialPage?.nextCursor ?? null,
+  );
+  const [loading, setLoading] = useState(!initialPage);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
   const cursorRef = useRef<string | null>(null);
+  const initialPageLoadedRef = useRef(false);
 
   const load = useCallback(async (more = false) => {
     controllerRef.current?.abort();
@@ -61,11 +78,19 @@ export function PostFeed({ type, discount, pieceNumber }: PostFeedProps) {
 
   useEffect(() => {
     cursorRef.current = null;
-    // A filter change intentionally resets the visible page before the new request.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+
+    if (!initialPageLoadedRef.current && initialPage) {
+      initialPageLoadedRef.current = true;
+      setItems(initialPage.items);
+      setCursor(initialPage.nextCursor);
+      cursorRef.current = initialPage.nextCursor;
+      setLoading(false);
+      return;
+    }
+
     void load();
     return () => controllerRef.current?.abort();
-  }, [load]);
+  }, [initialPage, load]);
 
   return (
     <section aria-label="最新发布">
@@ -92,11 +117,24 @@ export function PostFeed({ type, discount, pieceNumber }: PostFeedProps) {
 
       {loading ? (
         <div
-          className="flex flex-col items-center gap-3 py-12 text-sm text-slate-500"
+          className="space-y-3"
           aria-label="加载中"
         >
-          <LoaderCircle className="size-7 animate-spin text-blue-600" />
-          <span>正在寻找最新的拼图...</span>
+          <span className="sr-only">正在寻找最新的拼图...</span>
+          {Array.from({ length: 3 }, (_, index) => (
+            <div
+              key={index}
+              className="rounded-lg border border-slate-100 bg-white p-4"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-3 w-52 max-w-full" />
+                </div>
+                <Skeleton className="h-9 w-24 rounded-full" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : error ? (
         <div className="space-y-3 py-10 text-center">

@@ -1,4 +1,5 @@
 import { CircleHelp } from "lucide-react";
+import Link from "next/link";
 
 import { AccountSubpageHeader } from "@/features/account/components/account-subpage-header";
 import { EmptyState } from "@/features/account/components/empty-state";
@@ -11,8 +12,16 @@ import { getMyHelpedPosts } from "@/features/posts/server/user-queries";
 
 export const dynamic = "force-dynamic";
 
-export default async function HelpedPostsPage() {
-  const posts = await getMyHelpedPosts();
+type HelpedPostsPageProps = {
+  searchParams?: Promise<{ cursor?: string | string[] }>;
+};
+
+export default async function HelpedPostsPage({
+  searchParams,
+}: HelpedPostsPageProps = {}) {
+  const params = searchParams ? await searchParams : {};
+  const page = await getMyHelpedPosts(readCursor(params.cursor));
+  const posts = page.items;
   const pendingHelpCount = posts.filter((post) => post.status === "PENDING").length;
 
   return (
@@ -35,34 +44,48 @@ export default async function HelpedPostsPage() {
           description="完成一次求助助力后，确认状态和内容会保留在这里。"
         />
       ) : (
-        <ul className="space-y-3">
-          {posts.map((post) => (
-            <li
-              key={post.attemptId}
-              className="space-y-3 rounded-lg border border-slate-200 px-4 py-3"
+        <div className="space-y-3">
+          <ul className="space-y-3">
+            {posts.map((post) => (
+              <li
+                key={post.attemptId}
+                className="space-y-3 rounded-lg border border-slate-200 px-4 py-3"
+              >
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-slate-900">
+                    求助 · {discountLabel(post.discount)} · 第 {post.pieceNumber} 块
+                  </p>
+                  <p className="text-xs text-slate-500">{helpStatusLabel(post)}</p>
+                </div>
+
+                {post.status === "PENDING" ? (
+                  <p className="text-sm font-medium text-slate-700">
+                    <ConfirmationCountdown deadline={post.confirmationDeadline} />
+                  </p>
+                ) : null}
+
+                <div className="border-t border-slate-100 pt-3">
+                  <HelpedPayloadActions payloads={post.payloads} />
+                </div>
+              </li>
+            ))}
+          </ul>
+          {page.nextCursor ? (
+            <Link
+              href={`/me/helped?cursor=${encodeURIComponent(page.nextCursor)}`}
+              className="flex h-10 w-full items-center justify-center rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:border-blue-200 hover:text-blue-700"
             >
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-slate-900">
-                  求助 · {discountLabel(post.discount)} · 第 {post.pieceNumber} 块
-                </p>
-                <p className="text-xs text-slate-500">{helpStatusLabel(post)}</p>
-              </div>
-
-              {post.status === "PENDING" ? (
-                <p className="text-sm font-medium text-slate-700">
-                  <ConfirmationCountdown deadline={post.confirmationDeadline} />
-                </p>
-              ) : null}
-
-              <div className="border-t border-slate-100 pt-3">
-                <HelpedPayloadActions payloads={post.payloads} />
-              </div>
-            </li>
-          ))}
-        </ul>
+              加载更多
+            </Link>
+          ) : null}
+        </div>
       )}
     </div>
   );
+}
+
+function readCursor(value: string | string[] | undefined) {
+  return typeof value === "string" ? value : undefined;
 }
 
 function helpStatusLabel(post: MyHelpedPost) {

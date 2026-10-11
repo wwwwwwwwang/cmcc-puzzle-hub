@@ -46,7 +46,6 @@ export function parseSources(
   return {
     type: url.type,
     sources: { url: url.payload },
-    explicitSelection: null,
     identity: url.identity,
   };
 }

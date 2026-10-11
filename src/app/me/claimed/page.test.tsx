@@ -13,7 +13,7 @@ describe("ClaimedPostsPage", () => {
   afterEach(cleanup);
 
   it("空数据时显示返回链接和空状态", async () => {
-    getMyClaimedPosts.mockResolvedValue([]);
+    getMyClaimedPosts.mockResolvedValue({ items: [], nextCursor: null });
 
     render(await ClaimedPostsPage());
 
@@ -26,17 +26,20 @@ describe("ClaimedPostsPage", () => {
   });
 
   it("展示二维码链接且不显示口令", async () => {
-    getMyClaimedPosts.mockResolvedValue([
-      {
-        id: "claimed",
-        type: "GIVE",
-        discount: 80,
-        pieceNumber: 3,
-        payloads: {
-          url: "https://h.app.coc.10086.cn/activity/zx/transit/transferDownload.html?targetUrl=https%3A%2F%2Fwx.10086.cn%2Fhlwyxhdhub%2Fact-wedrecharge%2F1024101716%3FgiveCard%3Dabc",
+    getMyClaimedPosts.mockResolvedValue({
+      items: [
+        {
+          id: "claimed",
+          type: "GIVE",
+          discount: 80,
+          pieceNumber: 3,
+          payloads: {
+            url: "https://h.app.coc.10086.cn/activity/zx/transit/transferDownload.html?targetUrl=https%3A%2F%2Fwx.10086.cn%2Fhlwyxhdhub%2Fact-wedrecharge%2F1024101716%3FgiveCard%3Dabc",
+          },
         },
-      },
-    ]);
+      ],
+      nextCursor: null,
+    });
 
     render(await ClaimedPostsPage());
 

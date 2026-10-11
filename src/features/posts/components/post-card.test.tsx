@@ -54,9 +54,12 @@ describe("PostCard", () => {
     expect(screen.getByText("出/赠")).toBeInTheDocument();
     expect(screen.getByText("8折 · 第 6 号")).toBeInTheDocument();
     expect(screen.getByText(/发布者 U-0123456789ABCDEF（我）/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "获取拼图" })).toHaveClass(
+    expect(screen.getByRole("button", { name: "自己的帖子" })).toHaveClass(
       "bg-blue-600",
     );
+    expect(
+      screen.getByRole("button", { name: "自己的帖子" }),
+    ).toBeDisabled();
   });
 
   it("求助帖子显示去助力", () => {
@@ -77,7 +80,11 @@ describe("PostCard", () => {
   it("点击卡片领取按钮只打开确认抽屉，不请求 API", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
-    render(<PostCard post={post} />);
+    render(
+      <PostCard
+        post={{ ...post, publisherId: "U-FEDCBA9876543210" }}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "获取拼图" }));
 

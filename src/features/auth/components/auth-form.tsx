@@ -40,7 +40,7 @@ export function AuthForm({ action, submitLabel, redirectTo }: AuthFormProps) {
           autoComplete="username"
           required
           aria-invalid={Boolean(state.fieldErrors?.username)}
-          className="h-11 rounded-xl border-slate-200 bg-slate-50 px-3 shadow-none focus-visible:border-blue-500 focus-visible:ring-blue-500/20"
+          className="h-11 rounded-lg border-slate-200 bg-slate-50 px-3 shadow-none focus-visible:border-blue-500 focus-visible:ring-blue-500/20"
         />
         {state.fieldErrors?.username ? (
           <p className="text-xs leading-5 text-destructive">{state.fieldErrors.username}</p>
@@ -58,7 +58,7 @@ export function AuthForm({ action, submitLabel, redirectTo }: AuthFormProps) {
           autoComplete="current-password"
           required
           aria-invalid={Boolean(state.fieldErrors?.password)}
-          className="h-11 rounded-xl border-slate-200 bg-slate-50 px-3 shadow-none focus-visible:border-blue-500 focus-visible:ring-blue-500/20"
+          className="h-11 rounded-lg border-slate-200 bg-slate-50 px-3 shadow-none focus-visible:border-blue-500 focus-visible:ring-blue-500/20"
         />
         {state.fieldErrors?.password ? (
           <p className="text-xs leading-5 text-destructive">
@@ -79,7 +79,7 @@ export function AuthForm({ action, submitLabel, redirectTo }: AuthFormProps) {
       <Button
         type="submit"
         size="lg"
-        className="h-11 w-full rounded-xl bg-blue-600 font-semibold text-white shadow-sm hover:bg-blue-700"
+        className="h-11 w-full rounded-lg bg-blue-600 font-semibold text-white shadow-sm hover:bg-blue-700"
         disabled={pending}
       >
         {pending ? "处理中…" : submitLabel}

@@ -1,4 +1,5 @@
 import { ClipboardList } from "lucide-react";
+import Link from "next/link";
 
 import { AccountSubpageHeader } from "@/features/account/components/account-subpage-header";
 import { EmptyState } from "@/features/account/components/empty-state";
@@ -16,8 +17,16 @@ import { getMyPosts } from "@/features/posts/server/user-queries";
 
 export const dynamic = "force-dynamic";
 
-export default async function MyPostsPage() {
-  const posts = await getMyPosts();
+type MyPostsPageProps = {
+  searchParams?: Promise<{ cursor?: string | string[] }>;
+};
+
+export default async function MyPostsPage({
+  searchParams,
+}: MyPostsPageProps = {}) {
+  const params = searchParams ? await searchParams : {};
+  const page = await getMyPosts(readCursor(params.cursor));
+  const posts = page.items;
   const pendingConfirmationCount = posts.filter(
     (post) => post.type === "REQUEST" && post.status === "PENDING_CONFIRM",
   ).length;
@@ -42,40 +51,54 @@ export default async function MyPostsPage() {
           description="发布成功后，可以在这里查看状态并管理可领取的帖子。"
         />
       ) : (
-        <ul className="space-y-3">
-          {posts.map((post) => (
-            <li
-              key={post.id}
-              className="space-y-3 rounded-lg border border-slate-200 px-4 py-3"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 space-y-1">
-                  <p className="text-sm font-semibold text-slate-900">
-                    {postTypeLabel(post.type)} · {discountLabel(post.discount)} · 第
-                    {post.pieceNumber} 块
-                  </p>
-                  <p className="text-xs text-slate-500">{postSummary(post)}</p>
+        <div className="space-y-3">
+          <ul className="space-y-3">
+            {posts.map((post) => (
+              <li
+                key={post.id}
+                className="space-y-3 rounded-lg border border-slate-200 px-4 py-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {postTypeLabel(post.type)} · {discountLabel(post.discount)} · 第
+                      {post.pieceNumber} 块
+                    </p>
+                    <p className="text-xs text-slate-500">{postSummary(post)}</p>
+                  </div>
+                  {post.status === "OPEN" ? <DelistButton postId={post.id} /> : null}
                 </div>
-                {post.status === "OPEN" ? <DelistButton postId={post.id} /> : null}
-              </div>
 
-              {post.type === "REQUEST" &&
-              post.status === "PENDING_CONFIRM" &&
-              post.confirmationDeadline ? (
-                <div className="space-y-2 border-t border-slate-100 pt-3">
-                  <p className="text-xs text-slate-500">24 小时后自动确认</p>
-                  <p className="text-sm font-medium text-slate-700">
-                    <ConfirmationCountdown deadline={post.confirmationDeadline} />
-                  </p>
-                  <RequestHelpActions postId={post.id} />
-                </div>
-              ) : null}
-            </li>
-          ))}
-        </ul>
+                {post.type === "REQUEST" &&
+                post.status === "PENDING_CONFIRM" &&
+                post.confirmationDeadline ? (
+                  <div className="space-y-2 border-t border-slate-100 pt-3">
+                    <p className="text-xs text-slate-500">24 小时后自动确认</p>
+                    <p className="text-sm font-medium text-slate-700">
+                      <ConfirmationCountdown deadline={post.confirmationDeadline} />
+                    </p>
+                    <RequestHelpActions postId={post.id} />
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          {page.nextCursor ? (
+            <Link
+              href={`/me/posts?cursor=${encodeURIComponent(page.nextCursor)}`}
+              className="flex h-10 w-full items-center justify-center rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:border-blue-200 hover:text-blue-700"
+            >
+              加载更多
+            </Link>
+          ) : null}
+        </div>
       )}
     </div>
   );
+}
+
+function readCursor(value: string | string[] | undefined) {
+  return typeof value === "string" ? value : undefined;
 }
 
 function postSummary(post: MyPost) {

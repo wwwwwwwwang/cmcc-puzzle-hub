@@ -18,10 +18,6 @@ export type PostSources = {
   url?: string;
 };
 
-export type PayloadHashes = {
-  url?: string;
-};
-
 export type PuzzleSelection = {
   discount: Discount;
   pieceNumber: number;
@@ -31,14 +27,12 @@ export type ParsedSource = {
   type: PostType;
   payloadKind: PayloadKind;
   payload: string;
-  explicitSelection: null;
   identity: string;
 };
 
 export type ParsedSources = {
   type: PostType;
   sources: PostSources;
-  explicitSelection: null;
   identity: string;
 };
 
@@ -51,8 +45,7 @@ export type HallPostDto = PuzzleSelection & {
   expiresAt: string;
 };
 
-export type StoredPost = Omit<HallPostDto, "publisherId"> & {
-  payloads: PostSources;
-  payloadHashes: PayloadHashes;
-  publisherDeviceHash: string;
+export type HallPostPage = {
+  items: HallPostDto[];
+  nextCursor: string | null;
 };

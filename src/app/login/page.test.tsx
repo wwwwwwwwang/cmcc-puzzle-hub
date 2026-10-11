@@ -25,7 +25,7 @@ describe("LoginPage", () => {
       }),
     );
 
-    expect(screen.getByRole("main")).toBeInTheDocument();
+    expect(screen.queryByRole("main")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "登录" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "登录表单" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "登录" })).toBeInTheDocument();

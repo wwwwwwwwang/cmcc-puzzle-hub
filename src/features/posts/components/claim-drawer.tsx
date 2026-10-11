@@ -188,7 +188,7 @@ export function ClaimDrawer({
         <DrawerFooter>
           <Button
             type="button"
-            className="h-12 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+            className="h-12 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
             disabled={submitting || (isAuthenticated && !isApproved)}
             onClick={() => void handleClaim()}
           >

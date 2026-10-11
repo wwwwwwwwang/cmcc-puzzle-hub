@@ -21,9 +21,11 @@ vi.mock("@upstash/ratelimit", () => ({
 
 import {
   checkClaimRateLimit,
+  checkHallRateLimit,
   checkPublishRateLimit,
   createDailyClaimRateLimiter,
   createDailyPublishRateLimiter,
+  createHallRateLimiter,
   createPublishRateLimiter,
 } from "./rate-limit";
 
@@ -74,6 +76,22 @@ describe("rate limit 构造", () => {
       prefix: "rate:claim:day",
     });
   });
+
+  it("大厅读取限流用 1m 窗口与 rate:hall:minute 前缀", () => {
+    const redis = {};
+    createHallRateLimiter(redis as never, 60);
+    expect(slidingWindowSpy).toHaveBeenCalledWith(60, "1 m");
+    expect(constructorSpy).toHaveBeenCalledWith({
+      redis,
+      limiter: "sliding-window",
+      prefix: "rate:hall:minute",
+    });
+  });
+
+  it("大厅读取限流默认上限为 120", () => {
+    createHallRateLimiter({} as never);
+    expect(slidingWindowSpy).toHaveBeenCalledWith(120, "1 m");
+  });
 });
 
 describe("checkPublishRateLimit", () => {
@@ -107,6 +125,21 @@ describe("checkClaimRateLimit", () => {
       checkClaimRateLimit("user-1", "1.2.3.4", limiter as never),
     ).resolves.toEqual({ success: false, reset: 20 });
     expect(limiter.limit).toHaveBeenCalledWith("user:user-1");
+    expect(limiter.limit).toHaveBeenCalledWith("ip:1.2.3.4");
+  });
+});
+
+describe("checkHallRateLimit", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("按 ip 维度校验", async () => {
+    const limiter = {
+      limit: vi.fn().mockResolvedValue({ success: true, reset: 20 }),
+    };
+
+    await expect(
+      checkHallRateLimit("1.2.3.4", limiter as never),
+    ).resolves.toEqual({ success: true, reset: 20 });
     expect(limiter.limit).toHaveBeenCalledWith("ip:1.2.3.4");
   });
 });

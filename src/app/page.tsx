@@ -1,12 +1,19 @@
 import { PostFeed } from "@/features/posts/components/post-feed";
 import { PostFilters } from "@/features/posts/components/post-filters";
 import type { Discount, PostType } from "@/features/posts/domain/types";
+import { listPosts } from "@/features/posts/server/post-repository";
 
 export default async function Home({ searchParams }: PageProps<"/">) {
   const query = await searchParams;
   const type = parseType(query.type);
   const discount = parseDiscount(query.discount) ?? 80;
   const pieceNumber = parsePieceNumber(query.pieceNumber, discount);
+  const initialPage = await listPosts({
+    type,
+    discount,
+    pieceNumber: pieceNumber ?? undefined,
+    limit: 20,
+  }).catch(() => undefined);
 
   return (
     <section className="min-h-dvh bg-white">
@@ -25,6 +32,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           discount={discount}
           type={type}
           pieceNumber={pieceNumber ?? undefined}
+          initialPage={initialPage}
         />
       </div>
     </section>

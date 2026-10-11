@@ -16,7 +16,8 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'pnpm dev --hostname 127.0.0.1 --port 3100',
+    command:
+      'node node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port 3100',
     url: e2eBaseUrl,
     reuseExistingServer: false,
     timeout: 180_000,

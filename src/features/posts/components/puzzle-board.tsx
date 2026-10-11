@@ -4,18 +4,12 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef } from "react";
 
 import type { Discount } from "../domain/types";
-
-const pieceCountByDiscount = {
-  95: 4,
-  90: 6,
-  80: 9,
-} as const satisfies Record<Discount, number>;
-
-const discountLabel = {
-  95: "95折",
-  90: "9折",
-  80: "8折",
-} as const satisfies Record<Discount, string>;
+import {
+  getPuzzleColumns,
+  puzzleDiscountLabels,
+  puzzlePieceCounts,
+  usePuzzleGridNavigation,
+} from "./puzzle-grid";
 
 type PuzzleBoardProps = {
   discount: Discount;
@@ -31,10 +25,14 @@ export function PuzzleBoard({
   disabled = false,
 }: PuzzleBoardProps) {
   const reduceMotion = useReducedMotion();
-  const count = pieceCountByDiscount[discount];
-  const columns = discount === 80 ? 3 : 2;
+  const count = puzzlePieceCounts[discount];
+  const columns = getPuzzleColumns(discount);
   const previousDiscount = useRef(discount);
-  const pieceRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const { refs: pieceRefs, handleKeyDown } = usePuzzleGridNavigation({
+    count,
+    onChange,
+    disabled,
+  });
 
   useEffect(() => {
     if (previousDiscount.current !== discount) {
@@ -43,38 +41,10 @@ export function PuzzleBoard({
     }
   }, [discount, onChange]);
 
-  function selectAndFocus(pieceNumber: number) {
-    onChange(pieceNumber);
-    pieceRefs.current[pieceNumber - 1]?.focus();
-  }
-
-  function handleKeyDown(key: string, pieceNumber: number) {
-    if (disabled) return false;
-
-    switch (key) {
-      case "ArrowRight":
-      case "ArrowDown":
-        selectAndFocus(pieceNumber === count ? 1 : pieceNumber + 1);
-        return true;
-      case "ArrowLeft":
-      case "ArrowUp":
-        selectAndFocus(pieceNumber === 1 ? count : pieceNumber - 1);
-        return true;
-      case "Home":
-        selectAndFocus(1);
-        return true;
-      case "End":
-        selectAndFocus(count);
-        return true;
-      default:
-        return false;
-    }
-  }
-
   return (
     <div
       role="radiogroup"
-      aria-label={`${discountLabel[discount]}拼图选择`}
+      aria-label={`${puzzleDiscountLabels[discount]}拼图选择`}
       aria-disabled={disabled}
       className="grid gap-3"
       style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
@@ -92,7 +62,7 @@ export function PuzzleBoard({
             type="button"
             role="radio"
             aria-checked={selected}
-            aria-label={`${discountLabel[discount]}${pieceNumber}号拼图`}
+            aria-label={`${puzzleDiscountLabels[discount]}${pieceNumber}号拼图`}
             disabled={disabled}
             tabIndex={
               disabled
@@ -114,7 +84,7 @@ export function PuzzleBoard({
             }
             whileTap={reduceMotion ? undefined : { scale: 0.97 }}
             transition={reduceMotion ? undefined : { duration: 0.16 }}
-            className={`aspect-square rounded-2xl border text-sm font-semibold shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-slate-100 disabled:bg-slate-50 disabled:text-slate-300 disabled:shadow-none ${
+            className={`aspect-square rounded-lg border text-sm font-semibold shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-slate-100 disabled:bg-slate-50 disabled:text-slate-300 disabled:shadow-none ${
               selected
                 ? "border-blue-500 bg-blue-600 text-white shadow-blue-200"
                 : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50"

@@ -1,17 +1,18 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { resolve } from "node:path";
 
-const pnpmCli = process.env.npm_execpath;
-if (!pnpmCli) {
-  throw new Error("无法定位 pnpm CLI，请通过 pnpm test:e2e 运行 E2E");
-}
+const playwrightCli = resolve(
+  process.cwd(),
+  "node_modules/@playwright/test/cli.js",
+);
 
 const playwrightArgs = process.argv.slice(2);
 if (playwrightArgs[0] === "--") playwrightArgs.shift();
 
 const child = spawn(
   process.execPath,
-  [pnpmCli, "exec", "playwright", "test", ...playwrightArgs],
+  [playwrightCli, "test", ...playwrightArgs],
   {
     stdio: "inherit",
     env: {

@@ -24,7 +24,7 @@ describe("HelpedPostsPage", () => {
   afterEach(cleanup);
 
   it("空数据时显示返回链接和空状态", async () => {
-    getMyHelpedPosts.mockResolvedValue([]);
+    getMyHelpedPosts.mockResolvedValue({ items: [], nextCursor: null });
 
     render(await HelpedPostsPage());
 
@@ -36,38 +36,41 @@ describe("HelpedPostsPage", () => {
   });
 
   it("展示等待确认、完成方式和未收到历史", async () => {
-    getMyHelpedPosts.mockResolvedValue([
-      {
-        attemptId: "pending",
-        postId: "post-pending",
-        discount: 80,
-        pieceNumber: 1,
-        payloads: { url: "https://h.app.coc.10086.cn/pending" },
-        status: "PENDING",
-        confirmationDeadline: "2026-08-07T00:00:00.000Z",
-        confirmationMethod: null,
-      },
-      {
-        attemptId: "completed",
-        postId: "post-completed",
-        discount: 90,
-        pieceNumber: 2,
-        payloads: { url: "https://h.app.coc.10086.cn/completed" },
-        status: "COMPLETED",
-        confirmationDeadline: "2026-08-07T00:00:00.000Z",
-        confirmationMethod: "AUTO",
-      },
-      {
-        attemptId: "rejected",
-        postId: "post-rejected",
-        discount: 95,
-        pieceNumber: 3,
-        payloads: { url: "https://h.app.coc.10086.cn/rejected" },
-        status: "REJECTED",
-        confirmationDeadline: "2026-08-07T00:00:00.000Z",
-        confirmationMethod: null,
-      },
-    ]);
+    getMyHelpedPosts.mockResolvedValue({
+      items: [
+        {
+          attemptId: "pending",
+          postId: "post-pending",
+          discount: 80,
+          pieceNumber: 1,
+          payloads: { url: "https://h.app.coc.10086.cn/pending" },
+          status: "PENDING",
+          confirmationDeadline: "2026-08-07T00:00:00.000Z",
+          confirmationMethod: null,
+        },
+        {
+          attemptId: "completed",
+          postId: "post-completed",
+          discount: 90,
+          pieceNumber: 2,
+          payloads: { url: "https://h.app.coc.10086.cn/completed" },
+          status: "COMPLETED",
+          confirmationDeadline: "2026-08-07T00:00:00.000Z",
+          confirmationMethod: "AUTO",
+        },
+        {
+          attemptId: "rejected",
+          postId: "post-rejected",
+          discount: 95,
+          pieceNumber: 3,
+          payloads: { url: "https://h.app.coc.10086.cn/rejected" },
+          status: "REJECTED",
+          confirmationDeadline: "2026-08-07T00:00:00.000Z",
+          confirmationMethod: null,
+        },
+      ],
+      nextCursor: null,
+    });
 
     render(await HelpedPostsPage());
 

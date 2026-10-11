@@ -36,7 +36,6 @@ describe("parseUrl", () => {
       type: "GIVE",
       payloadKind: "URL",
       payload: GIVE_URL,
-      explicitSelection: null,
       identity: GIVE_IDENTITY,
     });
   });
@@ -46,7 +45,6 @@ describe("parseUrl", () => {
       type: "REQUEST",
       payloadKind: "URL",
       payload: REQUEST_URL,
-      explicitSelection: null,
       identity: REQUEST_IDENTITY,
     });
   });

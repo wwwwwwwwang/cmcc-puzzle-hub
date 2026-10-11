@@ -13,7 +13,7 @@ export default async function RegisterPage({
   const redirectTo = typeof redirect === "string" ? redirect : undefined;
 
   return (
-    <main className="min-h-dvh bg-slate-100 px-4 py-8 sm:px-6 sm:py-12">
+    <div className="min-h-dvh bg-slate-100 px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto flex w-full max-w-md flex-col gap-5">
         <header className="space-y-3">
           <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-wide text-blue-600">
@@ -34,7 +34,7 @@ export default async function RegisterPage({
 
         <section
           aria-label="注册表单"
-          className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+          className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
         >
           <div
             role="note"
@@ -63,6 +63,6 @@ export default async function RegisterPage({
           </Link>
         </p>
       </div>
-    </main>
+    </div>
   );
 }

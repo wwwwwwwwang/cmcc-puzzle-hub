@@ -21,6 +21,11 @@ export function PostCard({ post, onRemoved }: PostCardProps) {
   const sourceLabel = "二维码";
   const isOwnPost = publicId !== null && publicId === post.publisherId;
   const metaLabel = `发布者 ${post.publisherId}${isOwnPost ? "（我）" : ""} · ${sourceLabel} · ${formatRelativeTime(post.createdAt)}`;
+  const actionLabel = isOwnPost
+    ? "自己的帖子"
+    : post.type === "GIVE"
+      ? "获取拼图"
+      : "去助力";
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen);
@@ -58,14 +63,17 @@ export function PostCard({ post, onRemoved }: PostCardProps) {
         </div>
         <Button
           type="button"
-          onClick={() => setOpen(true)}
-          className={`shrink-0 rounded-full px-[18px] text-white ${
+          disabled={isOwnPost}
+          onClick={() => {
+            if (!isOwnPost) setOpen(true);
+          }}
+          className={`shrink-0 rounded-full px-[18px] text-white disabled:cursor-not-allowed disabled:opacity-60 ${
             post.type === "GIVE"
               ? "bg-blue-600 shadow-[0_2px_4px_rgba(37,99,235,0.2)] hover:bg-blue-700"
               : "bg-orange-500 shadow-[0_2px_4px_rgba(249,115,22,0.2)] hover:bg-orange-600"
           }`}
         >
-          {post.type === "GIVE" ? "获取拼图" : "去助力"}
+          {actionLabel}
         </Button>
       </div>
       {open ? (

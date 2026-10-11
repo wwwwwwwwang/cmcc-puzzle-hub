@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 
@@ -13,7 +14,7 @@ import {
  * 用于 Server Components / Server Actions / Route Handlers 中读取当前登录用户,
  * RLS 以该用户身份生效。
  */
-export async function createSupabaseServerClient() {
+export const createSupabaseServerClient = cache(async () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -41,18 +42,44 @@ export async function createSupabaseServerClient() {
       },
     },
   });
-}
+});
 
-/**
- * 读取当前登录用户;未登录返回 null。
- */
-export async function getCurrentUser() {
+type ProfileRow = {
+  public_id: string;
+  username: string | null;
+  status: string;
+  is_admin: boolean;
+};
+
+const getSessionContext = cache(async () => {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return user;
-}
+
+  if (!user) {
+    return { supabase, user: null, profile: null };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("public_id, username, status, is_admin")
+    .eq("id", user.id)
+    .single();
+
+  return {
+    supabase,
+    user,
+    profile: (profile as ProfileRow | null) ?? null,
+  };
+});
+
+/**
+ * 读取当前登录用户;未登录返回 null。
+ */
+export const getCurrentUser = cache(async () => {
+  return (await getSessionContext()).user;
+});
 
 /**
  * 读取当前会话的公开身份(供客户端 AuthSession 初始化)。
@@ -74,7 +101,7 @@ const ANON_SESSION: SessionProfile = {
   username: null,
 };
 
-export async function getAuthSession(): Promise<SessionProfile> {
+export const getAuthSession = cache(async (): Promise<SessionProfile> => {
   const cookieStore = await cookies();
   const e2eSession = getE2eAuthSession(
     cookieStore.get(E2E_AUTH_COOKIE)?.value,
@@ -90,18 +117,9 @@ export async function getAuthSession(): Promise<SessionProfile> {
     return ANON_SESSION;
   }
 
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, profile } = await getSessionContext();
 
   if (!user) return ANON_SESSION;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("public_id, username, status, is_admin")
-    .eq("id", user.id)
-    .single();
 
   // 被封禁或拒绝的账号视为未登录,不保留会话界面(写接口另有 getApprovedUser 拦截)。
   if (!profile || profile.status === "BANNED" || profile.status === "REJECTED") {
@@ -115,23 +133,14 @@ export async function getAuthSession(): Promise<SessionProfile> {
     publicId: (profile?.public_id as string | undefined) ?? null,
     username: (profile?.username as string | undefined) ?? null,
   };
-}
+});
 
 /**
  * 返回已通过审核的用户;未登录或未审核返回 null。供写接口门控。
  */
-export async function getApprovedUser() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export const getApprovedUser = cache(async () => {
+  const { user, profile } = await getSessionContext();
   if (!user) return null;
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("status")
-    .eq("id", user.id)
-    .single();
-
   return profile?.status === "APPROVED" ? user : null;
-}
+});

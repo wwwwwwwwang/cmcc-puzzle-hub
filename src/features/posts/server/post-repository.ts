@@ -6,6 +6,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type {
   Discount,
   HallPostDto,
+  HallPostPage,
   PayloadKind,
   PostSources,
   PostType,
@@ -76,11 +77,6 @@ export type ListPostFilters = {
   pieceNumber?: number;
   cursor?: string;
   limit?: number;
-};
-
-export type HallPostPage = {
-  items: HallPostDto[];
-  nextCursor: string | null;
 };
 
 function getClient(options: RepositoryOptions): AdminClient {

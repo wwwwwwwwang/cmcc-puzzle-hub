@@ -14,7 +14,10 @@ import {
   listPosts,
   publishPost,
 } from "@/features/posts/server/post-repository";
-import { checkPublishRateLimit } from "@/features/posts/server/rate-limit";
+import {
+  checkHallRateLimit,
+  checkPublishRateLimit,
+} from "@/features/posts/server/rate-limit";
 import { getApprovedUser } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
@@ -23,8 +26,20 @@ export async function GET(request: Request) {
   if (!parsed.success) return jsonError("INVALID_INPUT", 400, parsed.field);
 
   try {
+    const rate = await checkHallRateLimit(clientIp(request));
+    if (!rate.success) {
+      const retryAfter = Math.max(1, Math.ceil((rate.reset - Date.now()) / 1000));
+      return jsonError("RATE_LIMITED", 429, undefined, {
+        "Retry-After": String(retryAfter),
+      });
+    }
+
     const page = await listPosts(parsed.filters);
-    return Response.json(page);
+    return Response.json(page, {
+      headers: {
+        "Cache-Control": "public, max-age=5, stale-while-revalidate=15",
+      },
+    });
   } catch {
     logRouteError("SERVICE_UNAVAILABLE");
     return jsonError("SERVICE_UNAVAILABLE", 503);
@@ -91,6 +106,12 @@ export async function POST(request: Request) {
 
 function sha256(value: string) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function clientIp(request: Request) {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0]!.trim();
+  return request.headers.get("x-real-ip")?.trim() || "unknown";
 }
 
 function parseListQuery(searchParams: URLSearchParams) {

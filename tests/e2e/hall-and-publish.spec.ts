@@ -224,7 +224,7 @@ test("大厅按参考稿筛选折扣、类型和拼图编号", async ({ page }) 
   await expect(page.getByRole("radio")).toHaveCount(4);
 });
 
-test("大厅隐藏账户标识并为本人求助帖使用助力文案", async ({ page }) => {
+test("大厅隐藏账户标识并禁用本人帖子的操作按钮", async ({ page }) => {
   await installApiMocks(page, {
     post: { ...requestPost, publisherId: CURRENT_PUBLIC_ID },
     payloads: { url: GIVE_URL },
@@ -235,8 +235,9 @@ test("大厅隐藏账户标识并为本人求助帖使用助力文案", async ({
   await expect(
     page.getByText(`发布者 ${CURRENT_PUBLIC_ID}（我）`, { exact: false }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "去助力" }).click();
-  await expect(page.getByRole("button", { name: "使用链接助力" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "自己的帖子" }),
+  ).toBeDisabled();
 });
 
 test("大厅、领取抽屉和发布页无横向溢出", async ({ page }) => {

@@ -5,13 +5,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { publishPost, listPosts, checkPublishRateLimit, getApprovedUser } =
-  vi.hoisted(() => ({
-    publishPost: vi.fn(),
-    listPosts: vi.fn(),
-    checkPublishRateLimit: vi.fn(),
-    getApprovedUser: vi.fn(),
-  }));
+const {
+  publishPost,
+  listPosts,
+  checkPublishRateLimit,
+  checkHallRateLimit,
+  getApprovedUser,
+} = vi.hoisted(() => ({
+  publishPost: vi.fn(),
+  listPosts: vi.fn(),
+  checkPublishRateLimit: vi.fn(),
+  checkHallRateLimit: vi.fn(),
+  getApprovedUser: vi.fn(),
+}));
 
 vi.mock("@/features/posts/server/post-repository", () => ({
   publishPost,
@@ -19,6 +25,7 @@ vi.mock("@/features/posts/server/post-repository", () => ({
 }));
 vi.mock("@/features/posts/server/rate-limit", () => ({
   checkPublishRateLimit,
+  checkHallRateLimit,
 }));
 vi.mock("@/lib/supabase/server", () => ({ getApprovedUser }));
 
@@ -51,6 +58,7 @@ describe("/api/posts", () => {
     vi.clearAllMocks();
     getApprovedUser.mockResolvedValue({ id: USER_ID });
     checkPublishRateLimit.mockResolvedValue({ success: true, reset: Date.now() + 1000 });
+    checkHallRateLimit.mockResolvedValue({ success: true, reset: Date.now() + 1000 });
     publishPost.mockResolvedValue({
       status: "CREATED",
       post: {
@@ -248,6 +256,9 @@ describe("/api/posts", () => {
       ),
     );
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe(
+      "public, max-age=5, stale-while-revalidate=15",
+    );
     await expect(response.json()).resolves.toEqual({
       items: expect.any(Array),
       nextCursor: "cursor-value",
@@ -278,6 +289,19 @@ describe("/api/posts", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "INVALID_INPUT" },
+    });
+    expect(listPosts).not.toHaveBeenCalled();
+  });
+
+  it("GET 超限返回 429 和 Retry-After", async () => {
+    checkHallRateLimit.mockResolvedValue({ success: false, reset: Date.now() + 5000 });
+
+    const response = await GET(new Request("http://localhost/api/posts"));
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBeTruthy();
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "RATE_LIMITED" },
     });
     expect(listPosts).not.toHaveBeenCalled();
   });

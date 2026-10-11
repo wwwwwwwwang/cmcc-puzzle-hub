@@ -12,6 +12,7 @@ import { PostFeed } from "./post-feed";
 const post = {
   id: "p_1800000000000_123e4567-e89b-42d3-a456-426614174000",
   type: "GIVE" as const,
+  publisherId: "U-0123456789ABCDEF",
   discount: 80 as const,
   pieceNumber: 6,
   availablePayloadKinds: ["URL" as const],
@@ -73,6 +74,19 @@ describe("PostFeed", () => {
     render(<PostFeed />);
 
     expect(screen.getByText("正在寻找最新的拼图...")).toBeInTheDocument();
+  });
+
+  it("服务端首屏数据存在时不再发起首次请求", () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    render(
+      <PostFeed
+        initialPage={{ items: [post], nextCursor: null }}
+      />,
+    );
+
+    expect(screen.getByText(post.id)).toBeInTheDocument();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("显示空态与失败重试", async () => {

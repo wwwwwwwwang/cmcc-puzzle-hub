@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { parseUrl } from "@/features/posts/domain/parse-url";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MAX_QR_DECODE_EDGE = 1600;
 
 export type DecodeImage = (file: File) => Promise<string | null>;
 
@@ -93,25 +94,70 @@ export function QrImagePicker({
 }
 
 export async function decodeQrImage(file: File): Promise<string | null> {
-  const objectUrl = URL.createObjectURL(file);
+  if (typeof createImageBitmap === "function") {
+    const bitmap = await createImageBitmap(file);
+    try {
+      const { width, height } = getDecodeDimensions(
+        bitmap.width,
+        bitmap.height,
+      );
+      return decodeCanvasSource(bitmap, width, height);
+    } finally {
+      bitmap.close();
+    }
+  }
 
+  const objectUrl = URL.createObjectURL(file);
   try {
     const image = await loadImage(objectUrl);
-    const canvas = document.createElement("canvas");
-    canvas.width = image.naturalWidth;
-    canvas.height = image.naturalHeight;
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-
-    if (!context || canvas.width === 0 || canvas.height === 0) {
-      throw new Error("Unable to read QR image");
-    }
-
-    context.drawImage(image, 0, 0);
-    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-    return jsQR(imageData.data, imageData.width, imageData.height)?.data ?? null;
+    const { width, height } = getDecodeDimensions(
+      image.naturalWidth,
+      image.naturalHeight,
+    );
+    return decodeCanvasSource(image, width, height);
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
+}
+
+export function getDecodeDimensions(
+  width: number,
+  height: number,
+  maxEdge = MAX_QR_DECODE_EDGE,
+) {
+  if (
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    throw new Error("Unable to read QR image dimensions");
+  }
+
+  const scale = Math.min(1, maxEdge / Math.max(width, height));
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
+function decodeCanvasSource(
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+
+  if (!context) {
+    throw new Error("Unable to read QR image");
+  }
+
+  context.drawImage(source, 0, 0, width, height);
+  const imageData = context.getImageData(0, 0, width, height);
+  return jsQR(imageData.data, imageData.width, imageData.height)?.data ?? null;
 }
 
 function loadImage(source: string) {

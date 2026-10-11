@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef } from "react";
-
 import type { Discount } from "../domain/types";
-
-const counts = { 95: 4, 90: 6, 80: 9 } as const;
-const labels = { 95: "95折", 90: "9折", 80: "8折" } as const;
+import {
+  getPuzzleColumns,
+  puzzleDiscountLabels,
+  puzzlePieceCounts,
+  usePuzzleGridNavigation,
+} from "./puzzle-grid";
 
 type HallPuzzleBoardProps = {
   discount: Discount;
@@ -18,41 +19,19 @@ export function HallPuzzleBoard({
   value,
   onChange,
 }: HallPuzzleBoardProps) {
-  const count = counts[discount];
-  const columns = discount === 80 ? 3 : 2;
+  const count = puzzlePieceCounts[discount];
+  const columns = getPuzzleColumns(discount);
   const rows = count / columns;
-  const refs = useRef<Array<HTMLButtonElement | null>>([]);
-
-  function selectAndFocus(pieceNumber: number) {
-    onChange(pieceNumber);
-    refs.current[pieceNumber - 1]?.focus();
-  }
-
-  function handleKeyDown(key: string, pieceNumber: number) {
-    if (key === "ArrowRight" || key === "ArrowDown") {
-      selectAndFocus(pieceNumber === count ? 1 : pieceNumber + 1);
-      return true;
-    }
-    if (key === "ArrowLeft" || key === "ArrowUp") {
-      selectAndFocus(pieceNumber === 1 ? count : pieceNumber - 1);
-      return true;
-    }
-    if (key === "Home") {
-      selectAndFocus(1);
-      return true;
-    }
-    if (key === "End") {
-      selectAndFocus(count);
-      return true;
-    }
-    return false;
-  }
+  const { refs, handleKeyDown } = usePuzzleGridNavigation({
+    count,
+    onChange,
+  });
 
   return (
     <div
       role="radiogroup"
-      aria-label={`${labels[discount]}拼图选择`}
-      className="grid size-[270px] max-w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm"
+      aria-label={`${puzzleDiscountLabels[discount]}拼图选择`}
+      className="grid size-[270px] max-w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm"
       style={{
         gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
         gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
@@ -70,7 +49,7 @@ export function HallPuzzleBoard({
             type="button"
             role="radio"
             aria-checked={selected}
-            aria-label={`${labels[discount]}${pieceNumber}号拼图`}
+            aria-label={`${puzzleDiscountLabels[discount]}${pieceNumber}号拼图`}
             tabIndex={selected || (value === null && pieceNumber === 1) ? 0 : -1}
             onClick={() => onChange(selected ? null : pieceNumber)}
             onKeyDown={(event) => {

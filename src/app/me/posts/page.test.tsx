@@ -32,7 +32,7 @@ describe("MyPostsPage", () => {
   afterEach(cleanup);
 
   it("空数据时显示返回链接和空状态", async () => {
-    getMyPosts.mockResolvedValue([]);
+    getMyPosts.mockResolvedValue({ items: [], nextCursor: null });
 
     render(await MyPostsPage());
 
@@ -45,22 +45,25 @@ describe("MyPostsPage", () => {
   });
 
   it("只有可领取帖子显示下架操作", async () => {
-    getMyPosts.mockResolvedValue([
-      {
-        id: "open",
-        type: "GIVE",
-        discount: 80,
-        pieceNumber: 1,
-        status: "OPEN",
-      },
-      {
-        id: "claimed",
-        type: "REQUEST",
-        discount: 90,
-        pieceNumber: 2,
-        status: "CLAIMED",
-      },
-    ]);
+    getMyPosts.mockResolvedValue({
+      items: [
+        {
+          id: "open",
+          type: "GIVE",
+          discount: 80,
+          pieceNumber: 1,
+          status: "OPEN",
+        },
+        {
+          id: "claimed",
+          type: "REQUEST",
+          discount: 90,
+          pieceNumber: 2,
+          status: "CLAIMED",
+        },
+      ],
+      nextCursor: null,
+    });
 
     render(await MyPostsPage());
 
@@ -73,17 +76,20 @@ describe("MyPostsPage", () => {
   });
 
   it("求助待确认时展示倒计时和收货操作", async () => {
-    getMyPosts.mockResolvedValue([
-      {
-        id: "pending",
-        type: "REQUEST",
-        discount: 90,
-        pieceNumber: 4,
-        status: "PENDING_CONFIRM",
-        confirmationDeadline: "2026-08-07T00:00:00.000Z",
-        confirmationMethod: null,
-      },
-    ]);
+    getMyPosts.mockResolvedValue({
+      items: [
+        {
+          id: "pending",
+          type: "REQUEST",
+          discount: 90,
+          pieceNumber: 4,
+          status: "PENDING_CONFIRM",
+          confirmationDeadline: "2026-08-07T00:00:00.000Z",
+          confirmationMethod: null,
+        },
+      ],
+      nextCursor: null,
+    });
 
     render(await MyPostsPage());
 
@@ -94,21 +100,46 @@ describe("MyPostsPage", () => {
     expect(screen.getByRole("button", { name: "刷新状态" })).toBeInTheDocument();
   });
 
+  it("存在下一页时显示加载更多链接", async () => {
+    getMyPosts.mockResolvedValue({
+      items: [
+        {
+          id: "post-1",
+          type: "GIVE",
+          discount: 80,
+          pieceNumber: 1,
+          status: "OPEN",
+        },
+      ],
+      nextCursor: "next-page",
+    });
+
+    render(await MyPostsPage());
+
+    expect(screen.getByRole("link", { name: "加载更多" })).toHaveAttribute(
+      "href",
+      "/me/posts?cursor=next-page",
+    );
+  });
+
   it.each([
     ["MANUAL", "已主动确认收到"],
     ["AUTO", "已自动确认收到"],
   ])("完成求助显示 %s 确认结果", async (confirmationMethod, label) => {
-    getMyPosts.mockResolvedValue([
-      {
-        id: `completed-${confirmationMethod}`,
-        type: "REQUEST",
-        discount: 80,
-        pieceNumber: 6,
-        status: "COMPLETED",
-        confirmationDeadline: "2026-08-07T00:00:00.000Z",
-        confirmationMethod,
-      },
-    ]);
+    getMyPosts.mockResolvedValue({
+      items: [
+        {
+          id: `completed-${confirmationMethod}`,
+          type: "REQUEST",
+          discount: 80,
+          pieceNumber: 6,
+          status: "COMPLETED",
+          confirmationDeadline: "2026-08-07T00:00:00.000Z",
+          confirmationMethod,
+        },
+      ],
+      nextCursor: null,
+    });
 
     render(await MyPostsPage());
 

@@ -13,7 +13,7 @@ export default async function LoginPage({
   const redirectTo = typeof redirect === "string" ? redirect : undefined;
 
   return (
-    <main className="min-h-dvh bg-slate-100 px-4 py-8 sm:px-6 sm:py-12">
+    <div className="min-h-dvh bg-slate-100 px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto flex w-full max-w-md flex-col gap-5">
         <header className="space-y-3">
           <div className="inline-flex items-center gap-2 text-xs font-semibold tracking-wide text-blue-600">
@@ -34,7 +34,7 @@ export default async function LoginPage({
 
         <section
           aria-label="登录表单"
-          className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+          className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
         >
           <AuthForm action={signIn} submitLabel="登录" redirectTo={redirectTo} />
         </section>
@@ -53,6 +53,6 @@ export default async function LoginPage({
           </Link>
         </p>
       </div>
-    </main>
+    </div>
   );
 }

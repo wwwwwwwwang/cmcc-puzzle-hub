@@ -25,7 +25,7 @@ describe("RegisterPage", () => {
       }),
     );
 
-    expect(screen.getByRole("main")).toBeInTheDocument();
+    expect(screen.queryByRole("main")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "注册" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "注册表单" })).toBeInTheDocument();
     expect(screen.getByRole("note", { name: "注册说明" })).toHaveTextContent(

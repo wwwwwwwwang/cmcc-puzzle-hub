@@ -13,6 +13,12 @@ import type {
 
 type RequestCreditStatus = "HELD" | "SETTLED" | "REFUNDED";
 type ClosureReason = "DELISTED" | "TIMEOUT";
+export const ACCOUNT_PAGE_SIZE = 20;
+
+export type AccountPage<T> = {
+  items: T[];
+  nextCursor: string | null;
+};
 
 export type MyPost = {
   id: string;
@@ -74,6 +80,7 @@ type PostRow = {
   closure_reason?: ClosureReason | null;
   created_at: string;
   expires_at: string;
+  claimed_at?: string | null;
   payloads?: PostSources;
   request_help_attempts?: {
     status: HelpAttemptStatus;
@@ -81,6 +88,40 @@ type PostRow = {
     confirmation_method: ConfirmationMethod | null;
   }[];
 };
+
+type AccountCursor = {
+  timestamp: string;
+  id: string;
+};
+
+function encodeAccountCursor(timestamp: string, id: string) {
+  return Buffer.from(JSON.stringify({ timestamp, id })).toString("base64url");
+}
+
+function decodeAccountCursor(value?: string): AccountCursor | null {
+  if (!value) return null;
+
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(value, "base64url").toString("utf8"),
+    ) as Partial<AccountCursor>;
+    if (
+      typeof parsed.timestamp !== "string" ||
+      !Number.isFinite(Date.parse(parsed.timestamp)) ||
+      typeof parsed.id !== "string" ||
+      parsed.id.length === 0
+    ) {
+      return null;
+    }
+    return { timestamp: parsed.timestamp, id: parsed.id };
+  } catch {
+    return null;
+  }
+}
+
+function accountCursorFilter(column: string, cursor: AccountCursor) {
+  return `${column}.lt.${cursor.timestamp},and(${column}.eq.${cursor.timestamp},id.lt.${cursor.id})`;
+}
 
 function toMyPost(row: PostRow): MyPost {
   const resolvedAttempt = row.request_help_attempts?.find(
@@ -105,46 +146,84 @@ function toMyPost(row: PostRow): MyPost {
 const POST_COLUMNS =
   "id, type, discount, piece_number, available_payload_kinds, status, request_credit_status, closure_reason, created_at, expires_at";
 
-export async function getMyPosts(): Promise<MyPost[]> {
+export async function getMyPosts(
+  cursorValue?: string,
+): Promise<AccountPage<MyPost>> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return [];
+  if (!user) return { items: [], nextCursor: null };
 
-  const { data, error } = await supabase
+  const cursor = decodeAccountCursor(cursorValue);
+  let query = supabase
     .from("posts")
     .select(
       `${POST_COLUMNS}, request_help_attempts(status, confirmation_deadline, confirmation_method)`,
     )
     .eq("publisher_id", user.id)
     .order("created_at", { ascending: false })
-    .limit(50);
+    .order("id", { ascending: false })
+    .limit(ACCOUNT_PAGE_SIZE + 1);
+
+  if (cursor) {
+    query = query.or(accountCursorFilter("created_at", cursor));
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(`查询我的帖子失败: ${error.message}`);
-  return ((data ?? []) as PostRow[]).map(toMyPost);
+  const allRows = (data ?? []) as PostRow[];
+  const rows = allRows.slice(0, ACCOUNT_PAGE_SIZE);
+  const last = rows.at(-1);
+  return {
+    items: rows.map(toMyPost),
+    nextCursor:
+      allRows.length > ACCOUNT_PAGE_SIZE && last
+        ? encodeAccountCursor(last.created_at, last.id)
+        : null,
+  };
 }
 
-export async function getMyClaimedPosts(): Promise<ClaimedPost[]> {
+export async function getMyClaimedPosts(
+  cursorValue?: string,
+): Promise<AccountPage<ClaimedPost>> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return [];
+  if (!user) return { items: [], nextCursor: null };
 
-  const { data, error } = await supabase
+  const cursor = decodeAccountCursor(cursorValue);
+  let query = supabase
     .from("posts")
-    .select(`${POST_COLUMNS}, payloads`)
+    .select(`${POST_COLUMNS}, claimed_at, payloads`)
     .eq("claimant_id", user.id)
     .eq("type", "GIVE")
     .order("claimed_at", { ascending: false })
-    .limit(50);
+    .order("id", { ascending: false })
+    .limit(ACCOUNT_PAGE_SIZE + 1);
+
+  if (cursor) {
+    query = query.or(accountCursorFilter("claimed_at", cursor));
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(`查询已领取帖子失败: ${error.message}`);
-  return ((data ?? []) as PostRow[]).map((row) => ({
-    ...toMyPost(row),
-    payloads: row.payloads ?? {},
-  }));
+  const allRows = (data ?? []) as PostRow[];
+  const rows = allRows.slice(0, ACCOUNT_PAGE_SIZE);
+  const last = rows.at(-1);
+  return {
+    items: rows.map((row) => ({
+      ...toMyPost(row),
+      payloads: row.payloads ?? {},
+    })),
+    nextCursor:
+      allRows.length > ACCOUNT_PAGE_SIZE && last?.claimed_at
+        ? encodeAccountCursor(last.claimed_at, last.id)
+        : null,
+  };
 }
 
 type HelpAttemptRow = {
@@ -168,39 +247,58 @@ type HelpAttemptRow = {
       }[];
 };
 
-export async function getMyHelpedPosts(): Promise<MyHelpedPost[]> {
+export async function getMyHelpedPosts(
+  cursorValue?: string,
+): Promise<AccountPage<MyHelpedPost>> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return [];
+  if (!user) return { items: [], nextCursor: null };
 
-  const { data, error } = await supabase
+  const cursor = decodeAccountCursor(cursorValue);
+  let query = supabase
     .from("request_help_attempts")
     .select(
       "id, post_id, status, helped_at, confirmation_deadline, confirmation_method, resolved_at, posts!request_help_attempts_post_id_fkey(discount, piece_number, payloads)",
     )
     .eq("helper_id", user.id)
     .order("helped_at", { ascending: false })
-    .limit(50);
+    .order("id", { ascending: false })
+    .limit(ACCOUNT_PAGE_SIZE + 1);
+
+  if (cursor) {
+    query = query.or(accountCursorFilter("helped_at", cursor));
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(`查询我帮助的帖子失败: ${error.message}`);
 
-  return ((data ?? []) as HelpAttemptRow[]).map((row) => {
-    const post = Array.isArray(row.posts) ? row.posts[0] : row.posts;
-    return {
-      attemptId: row.id,
-      postId: row.post_id,
-      discount: post.discount,
-      pieceNumber: post.piece_number,
-      payloads: post.payloads ?? {},
-      status: row.status,
-      confirmationDeadline: row.confirmation_deadline,
-      confirmationMethod: row.confirmation_method,
-      helpedAt: row.helped_at,
-      resolvedAt: row.resolved_at,
-    };
-  });
+  const allRows = (data ?? []) as HelpAttemptRow[];
+  const rows = allRows.slice(0, ACCOUNT_PAGE_SIZE);
+  const last = rows.at(-1);
+  return {
+    items: rows.map((row) => {
+      const post = Array.isArray(row.posts) ? row.posts[0] : row.posts;
+      return {
+        attemptId: row.id,
+        postId: row.post_id,
+        discount: post.discount,
+        pieceNumber: post.piece_number,
+        payloads: post.payloads ?? {},
+        status: row.status,
+        confirmationDeadline: row.confirmation_deadline,
+        confirmationMethod: row.confirmation_method,
+        helpedAt: row.helped_at,
+        resolvedAt: row.resolved_at,
+      };
+    }),
+    nextCursor:
+      allRows.length > ACCOUNT_PAGE_SIZE && last
+        ? encodeAccountCursor(last.helped_at, last.id)
+        : null,
+  };
 }
 
 export async function getAccountActivity(): Promise<AccountActivity | null> {
@@ -210,62 +308,31 @@ export async function getAccountActivity(): Promise<AccountActivity | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [confirmationResult, helpResult, postVersionResult, helpVersionResult] =
-    await Promise.all([
-      supabase
-        .from("posts")
-        .select("id", { count: "exact", head: true })
-        .eq("publisher_id", user.id)
-        .eq("status", "PENDING_CONFIRM"),
-      supabase
-        .from("request_help_attempts")
-        .select("id", { count: "exact", head: true })
-        .eq("helper_id", user.id)
-        .eq("status", "PENDING"),
-      supabase
-        .from("posts")
-        .select("updated_at")
-        .eq("publisher_id", user.id)
-        .order("updated_at", { ascending: false })
-        .limit(1),
-      supabase
-        .from("request_help_attempts")
-        .select("helped_at, resolved_at")
-        .eq("helper_id", user.id)
-        .order("resolved_at", { ascending: false, nullsFirst: false })
-        .limit(1),
-    ]);
-
-  const error =
-    confirmationResult.error ??
-    helpResult.error ??
-    postVersionResult.error ??
-    helpVersionResult.error;
+  const { data, error } = await supabase.rpc("get_account_activity");
   if (error) throw new Error(`查询账户活动失败: ${error.message}`);
 
-  const postVersion = (postVersionResult.data?.[0] as
-    | { updated_at?: string }
-    | undefined)?.updated_at;
-  const helpVersionRow = helpVersionResult.data?.[0] as
-    | { helped_at?: string; resolved_at?: string | null }
-    | undefined;
+  const activity = data as
+    | {
+        pendingConfirmationCount?: unknown;
+        pendingHelpCount?: unknown;
+        version?: unknown;
+      }
+    | null;
+
+  if (
+    !activity ||
+    typeof activity.pendingConfirmationCount !== "number" ||
+    typeof activity.pendingHelpCount !== "number" ||
+    typeof activity.version !== "string"
+  ) {
+    throw new Error("get_account_activity 返回异常");
+  }
 
   return {
-    pendingConfirmationCount: confirmationResult.count ?? 0,
-    pendingHelpCount: helpResult.count ?? 0,
-    version: latestVersion([
-      postVersion,
-      helpVersionRow?.helped_at,
-      helpVersionRow?.resolved_at,
-    ]),
+    pendingConfirmationCount: activity.pendingConfirmationCount,
+    pendingHelpCount: activity.pendingHelpCount,
+    version: activity.version,
   };
-}
-
-function latestVersion(values: (string | null | undefined)[]) {
-  return values.reduce<string>((latest, value) => {
-    if (!value) return latest;
-    return !latest || Date.parse(value) > Date.parse(latest) ? value : latest;
-  }, "0");
 }
 
 export async function getCreditOverview(): Promise<CreditOverview | null> {
